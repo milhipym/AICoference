@@ -30,3 +30,33 @@
     box-shadow: 0 0 25px rgba(255, 0, 204, 0.7);
     transform: scale(1.05);
   }
+/* 숨겨진 학습 버튼 스타일 */
+.hidden-learning-buttons {
+  position: absolute;
+  top: 10px;
+  right: 150px;
+  display: flex;
+  gap: 5px;
+  opacity: 0.1;
+  transition: opacity 0.3s;
+}
+
+.hidden-learning-buttons:hover {
+  opacity: 1;
+}
+
+.hidden-btn {
+  width: 25px;
+  height: 25px;
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  color: #00ffff;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.hidden-btn:hover {
+  background: rgba(0, 255, 255, 0.3);
+  border-color: #00ffff;
+}

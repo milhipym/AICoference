@@ -118,6 +118,16 @@
     <div class="detail-popup-content">
       <div class="detail-popup-header">
         <h2>◆ LOG STATISTICS ANALYSIS ◆</h2>
+        
+        <!-- 숨겨진 학습 버튼들 -->
+        <div class="hidden-learning-buttons">
+          <button id="btn_learn_1" class="hidden-btn" title="인덱스 생성">1</button>
+          <button id="btn_learn_2" class="hidden-btn" title="임베딩 생성">2</button>
+          <button id="btn_learn_3" class="hidden-btn" title="데이터 삽입">3</button>
+          <button id="btn_learn_4" class="hidden-btn" title="예약 기능">4</button>
+          <button id="btn_learn_5" class="hidden-btn" title="예약 기능">5</button>
+        </div>
+        
         <button class="detail-close-btn" onclick="closeDetailPopup()">✕ CLOSE</button>
       </div>
       
@@ -842,6 +852,206 @@
         if (detailBtn) {
           detailBtn.style.display = 'block';
         }
+      }
+    });
+
+    // ==================== 학습 기능 API ====================
+    const OPENSEARCH_API_BASE = "http://10.10.22.81:8080";
+
+    // 임베딩 생성 함수
+    async function embed_query(text) {
+      console.log('[embed_query] 임베딩 생성 시작:', text.substring(0, 50) + '...');
+      
+      try {
+        const response = await fetch(`${OPENSEARCH_API_BASE}/embed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('[embed_query] 임베딩 생성 완료, 벡터 길이:', data.embedding?.length);
+        return data.embedding;
+      } catch (error) {
+        console.error('[embed_query] 임베딩 생성 실패:', error);
+        alert('임베딩 생성 실패: ' + error.message);
+        return null;
+      }
+    }
+
+    // 1. 인덱스 생성
+    document.addEventListener('DOMContentLoaded', function() {
+      const btn1 = document.getElementById('btn_learn_1');
+      if (btn1) {
+        btn1.addEventListener('click', async function() {
+          console.log('[btn_learn_1] 인덱스 생성 버튼 클릭');
+          
+          const indexName = prompt('생성할 인덱스 이름을 입력하세요 (contest_XXX 형식):', 'contest_pm_task');
+          if (!indexName) {
+            console.log('[btn_learn_1] 인덱스 생성 취소됨');
+            return;
+          }
+          
+          console.log('[btn_learn_1] 인덱스 생성 요청:', indexName);
+          
+          try {
+            const response = await fetch(`${OPENSEARCH_API_BASE}/index_create`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                index: indexName, 
+                body: {} 
+              })
+            });
+            
+            const result = await response.json();
+            console.log('[btn_learn_1] 인덱스 생성 응답:', result);
+            
+            alert(result.message || '인덱스 생성 완료');
+          } catch (error) {
+            console.error('[btn_learn_1] 인덱스 생성 실패:', error);
+            alert('인덱스 생성 실패: ' + error.message);
+          }
+        });
+      }
+      
+      // 2. 임베딩 생성 테스트
+      const btn2 = document.getElementById('btn_learn_2');
+      if (btn2) {
+        btn2.addEventListener('click', async function() {
+          console.log('[btn_learn_2] 임베딩 생성 버튼 클릭');
+          
+          const text = prompt('임베딩을 생성할 텍스트를 입력하세요:', '안녕하세요, 저는 인공지능입니다.');
+          if (!text) {
+            console.log('[btn_learn_2] 임베딩 생성 취소됨');
+            return;
+          }
+          
+          const embedding = await embed_query(text);
+          
+          if (embedding) {
+            console.log('[btn_learn_2] 임베딩 결과 (처음 10개):', embedding.slice(0, 10));
+            alert(`임베딩 생성 완료!\n벡터 크기: ${embedding.length}\n처음 3개 값: ${embedding.slice(0, 3).join(', ')}`);
+          }
+        });
+      }
+      
+      // 3. 로그 데이터 삽입
+      const btn3 = document.getElementById('btn_learn_3');
+      if (btn3) {
+        btn3.addEventListener('click', async function() {
+          console.log('[btn_learn_3] 데이터 삽입 버튼 클릭');
+          
+          if (!mainModel.logfile) {
+            alert('먼저 로그 파일을 업로드하세요!');
+            console.log('[btn_learn_3] 로그 파일 없음');
+            return;
+          }
+          
+          const indexName = prompt('데이터를 삽입할 인덱스 이름을 입력하세요:', 'contest_pm_task');
+          if (!indexName) {
+            console.log('[btn_learn_3] 데이터 삽입 취소됨');
+            return;
+          }
+          
+          console.log('[btn_learn_3] 로그 파일 읽기 시작:', mainModel.logfile.name);
+          
+          try {
+            // 로그 파일 읽기
+            const logText = await mainModel.logfile.text();
+            console.log('[btn_learn_3] 로그 파일 크기:', logText.length, 'bytes');
+            
+            // 청크 크기 설정 (1000자 단위로 분할)
+            const CHUNK_SIZE = 1000;
+            const chunks = [];
+            
+            for (let i = 0; i < logText.length; i += CHUNK_SIZE) {
+              chunks.push(logText.substring(i, i + CHUNK_SIZE));
+            }
+            
+            console.log('[btn_learn_3] 총 청크 수:', chunks.length);
+            
+            if (!confirm(`총 ${chunks.length}개의 청크로 분할됩니다.\n계속하시겠습니까?`)) {
+              console.log('[btn_learn_3] 사용자 취소');
+              return;
+            }
+            
+            // 각 청크를 인덱스에 삽입
+            let successCount = 0;
+            let failCount = 0;
+            
+            for (let i = 0; i < chunks.length; i++) {
+              const chunk = chunks[i];
+              console.log(`[btn_learn_3] 청크 ${i+1}/${chunks.length} 처리 중...`);
+              
+              // 임베딩 생성
+              const embedding = await embed_query(chunk);
+              
+              if (!embedding) {
+                console.error(`[btn_learn_3] 청크 ${i+1} 임베딩 실패`);
+                failCount++;
+                continue;
+              }
+              
+              // 데이터 삽입
+              const response = await fetch(`${OPENSEARCH_API_BASE}/index`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  index: indexName,
+                  document: {
+                    text: chunk,
+                    embedding: embedding
+                  }
+                })
+              });
+              
+              const result = await response.json();
+              console.log(`[btn_learn_3] 청크 ${i+1} 삽입 결과:`, result);
+              
+              if (result.result === 'created') {
+                successCount++;
+              } else {
+                failCount++;
+              }
+              
+              // 진행률 표시 (10개마다)
+              if ((i + 1) % 10 === 0) {
+                console.log(`[btn_learn_3] 진행률: ${i+1}/${chunks.length}`);
+              }
+            }
+            
+            console.log('[btn_learn_3] 데이터 삽입 완료');
+            console.log('[btn_learn_3] 성공:', successCount, '실패:', failCount);
+            alert(`데이터 삽입 완료!\n성공: ${successCount}개\n실패: ${failCount}개`);
+            
+          } catch (error) {
+            console.error('[btn_learn_3] 데이터 삽입 중 오류:', error);
+            alert('데이터 삽입 실패: ' + error.message);
+          }
+        });
+      }
+      
+      // 4, 5번 버튼은 예약
+      const btn4 = document.getElementById('btn_learn_4');
+      const btn5 = document.getElementById('btn_learn_5');
+      
+      if (btn4) {
+        btn4.addEventListener('click', function() {
+          console.log('[btn_learn_4] 버튼 4 클릭 (예약됨)');
+          alert('이 기능은 아직 구현되지 않았습니다.');
+        });
+      }
+      
+      if (btn5) {
+        btn5.addEventListener('click', function() {
+          console.log('[btn_learn_5] 버튼 5 클릭 (예약됨)');
+          alert('이 기능은 아직 구현되지 않았습니다.');
+        });
       }
     });
   </script>
