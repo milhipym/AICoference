@@ -1,0 +1,32 @@
+.detailinfo-prev-next-btn, .detailinfo-AI-btn {
+	padding: 6px 14px;
+	border: none;
+	border-radius: 8px;
+	background: linear-gradient(90deg, #60a5fa, #3b82f6);
+	color: #fff;
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: transform 0.15s, box-shadow 0.15s;
+}
+
+  /*--------------------------------
+	ufomode
+  ==================================*/
+
+.ufomode .detailinfo-prev-next-btn,
+.ufomode .detailinfo-AI-btn {
+	border:1px solid var(--border);
+	background: #000;
+}
+
+.ufomode {
+    /*color:var(--muted);*/
+	color:#c9d1d9;
+}
+
+.ufomode .detailinfo-prev-next-btn:hover,
+.ufomode .detailinfo-AI-btn:hover{
+    box-shadow: 0 0 25px rgba(255, 0, 204, 0.7);
+    transform: scale(1.05);
+  }

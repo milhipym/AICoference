@@ -1,0 +1,220 @@
+
+.searchlist-bar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr; /* 좌 - 중앙 - 우 */
+    align-items: center;
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #111827 0%, #0b1222 100%);
+    color: #e5e7eb;
+    border: 1px solid rgba(255,255,255,.07);
+    white-space: nowrap;
+}
+
+.searchlist-left {
+	justify-self: start;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 600;
+}
+
+.searchlist-icon {
+	width: 18px; height: 18px;
+	display: inline-block;
+	mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24"><path d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg>') no-repeat center;
+	-webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24"><path d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg>') no-repeat center;
+	background: #60a5fa; /* 아이콘 색상 */
+}
+
+.searchlist-info-badge {
+	padding: 4px 10px;
+	border-radius: 6px;
+	background: rgba(96,165,250,.2);
+	color: #60a5fa;
+	font-weight: 700;
+}
+
+.searchlist-center { justify-self: center; display:flex; gap:10px; align-items:center; }
+.searchlist-right  { justify-self: end; font-weight: 600; }
+
+.searchlist-time {
+	padding: 6px 12px;
+	border-radius: 999px;
+	background: rgba(96,165,250,.15);
+	font-size: 14px;
+}
+
+.searchlist-btn {
+	padding: 6px 14px;
+	border: none;
+	border-radius: 8px;
+	background: linear-gradient(90deg, #60a5fa, #3b82f6);
+	color: #fff;
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.searchlist-count {
+	padding: 6px 12px;
+	border-radius: 8px;
+	background: rgba(244,114,182,.15);
+}
+
+/* ================================
+     시간대별 카드 UI (모달 내부)
+  ==================================*/
+
+  /* ✅ 세로 리스트 1열 */
+  .searchlist-wrap{
+    display: flex;
+    flex-direction: column; /* 세로 */
+    gap: 14px;
+  }
+
+  .searchlist-card{
+    background: var(--card);
+    border:1px solid var(--border);
+    border-radius:18px; padding:14px 16px;
+    display:flex; gap:14px; align-items:center;
+    box-shadow: 0 4px 12px rgba(0,0,0,.08);
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    position: relative;
+    flex-direction: column; /* 버튼을 아래로 내리기 위해 세로 배치 */
+    align-items: stretch;
+  }
+
+  .searchlist-cardinfo{ flex:1; display:grid; gap:6px; }
+  .searchlist-row1{ display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+  .searchlist-range{ font-weight:800; letter-spacing:.2px; }
+  .searchlist-wordwrap{
+    white-space: pre-line;     /* 기본 줄바꿈 허용 */
+    word-wrap: break-word;   /* 긴 단어도 줄바꿈 */
+    word-break: break-all;   /* (옵션) 단어 단위 무시하고 강제 줄바꿈 */
+  }
+  .searchlist-filetag{
+    color:#374151; background: #f3f4f6;
+    padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #e5e7eb;
+  }
+  .searchlist-rangecount{ margin-left:auto; display:flex; align-items:center; gap:8px; font-weight:800; }
+  .searchlist-barwrap{
+    height:10px; background: #f3f4f6; border:1px solid #e5e7eb;
+    border-radius:999px; overflow:hidden;
+  }
+  .searchlist-rangebar{
+    height:100%; width:0%;
+    background: linear-gradient(90deg, var(--good), #15803d, #0e7490);
+  }
+ 
+  .searchlist-muted{ color:var(--muted); font-weight:600; }
+
+  .searchlist-textred{
+    color: red;
+  }
+
+  .searchlist-timelabel{
+    border-radius: 8px;
+    border: 1px solid rgba(148,163,184,.25);
+    background: lightgray;
+    padding: 5px 12px;
+	  font-weight: 600;
+  }
+
+  .searchlist-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 5px;
+    justify-content: flex-start; /* 왼쪽 정렬 */
+  }
+
+  .searchlist-actions button {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(148,163,184,.25);
+    background: #1e293b;
+    color: #e5e7eb;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+  }
+
+  @media (min-width:720px){
+    .searchlist-card{ padding:16px 18px; }
+  }
+  
+  /*--------------------------------
+	ufomode
+  ==================================*/
+
+  .ufomode .searchlist-timelabel{
+	border:1px solid var(--border);
+    /*background: #222;*/
+	background:rgba(0, 217, 255, 0.15);
+	color:#00d9ff
+  }
+  
+  .ufomode .searchlist-btn {
+	border:1px solid var(--border);
+	color:var(--muted);
+    background: #000;
+}
+
+  .ufomode .searchlist-barwrap{
+    background: #555;
+  }
+  
+  .ufomode .searchlist-wordwrap{
+    width: 100%;
+  }
+  
+  .ufomode .searchlist-rangebar{
+    background: linear-gradient(90deg, var(--good), #34bd67, #34bd67);
+	/*background: #34bd67;*/
+  }
+  
+  .ufomode .searchlist-textred{
+	/*color:#ff8e8e;*/
+  }
+
+  .searchlist-wordwrap{
+    font-family: monospace;
+    color:#c9d1d9;
+    font-size: 13px;
+  }
+
+  .ufomode .searchlist-btn:hover {
+    box-shadow: 0 0 25px rgba(255, 0, 204, 0.7);
+    transform: scale(1.05);
+  }
+
+  .ufomode .searchlist-time {
+    padding: 6px 12px;
+	  border-radius: 999px;
+	  background: rgba(96,165,250,.0);
+    color: rgb(0, 217, 255);
+    font-size: 16px;
+    letter-spacing: 0.5px;
+  }
+
+  
+  .ufomode .searchlist-count{
+    background: rgba(96,165,250,.0);
+  }
+
+  .ufomode .searchlist-info-badge {
+    background: rgba(96,165,250,.0);
+  }
+
+  .ufomode .searchlist-bar{
+    border: 1px solid rgba(255, 255, 255, .0);
+    background: rgba(96,165,250,.0);
+  }
+
+  .ufomode .searchlist-left {
+    font-size: 18px;
+  }
+
+
+  
