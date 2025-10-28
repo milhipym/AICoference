@@ -1549,6 +1549,15 @@ async function doDetailAIAnalyze(logText, aiModel, aiLength) {
   loadingModal.open();
 
   try {
+    // 상세 디버깅 정보 (정상 작동하는 함수)
+    console.log('[DEBUG-WORKING] ===== doDetailAIAnalyze Context =====');
+    console.log('[DEBUG-WORKING] window.location.href:', window.location.href);
+    console.log('[DEBUG-WORKING] window.location.origin:', window.location.origin);
+    console.log('[DEBUG-WORKING] window.location.protocol:', window.location.protocol);
+    console.log('[DEBUG-WORKING] Target URL:', 'http://10.10.22.81:8080/vllm_chat');
+    console.log('[DEBUG-WORKING] Request body:', JSON.stringify({ model: aiModel, text: generateAnalysisPrompt(logText).substring(0, 100) + '...', limit: aiLength }));
+    console.log('[DEBUG-WORKING] =============================');
+    
     const response = await fetch('http://10.10.22.81:8080/vllm_chat', {
       method: 'POST',
       headers: {
@@ -1561,6 +1570,9 @@ async function doDetailAIAnalyze(logText, aiModel, aiLength) {
       })
     });
 
+    console.log('[DEBUG-WORKING] Response status:', response.status);
+    console.log('[DEBUG-WORKING] Response ok:', response.ok);
+    
     const result = await response.json();
     console.log("Response Data:", result);
     loadingModal.close();

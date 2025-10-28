@@ -997,12 +997,23 @@
     async function embed_query(text) {
       console.log('[embed_query] 임베딩 생성 시작:', text.substring(0, 50) + '...');
       
+      // 상세 디버깅 정보
+      console.log('[DEBUG-EMBED] ===== Execution Context =====');
+      console.log('[DEBUG-EMBED] window.location.href:', window.location.href);
+      console.log('[DEBUG-EMBED] window.location.origin:', window.location.origin);
+      console.log('[DEBUG-EMBED] OPENSEARCH_API_BASE:', OPENSEARCH_API_BASE);
+      console.log('[DEBUG-EMBED] Target URL:', `${OPENSEARCH_API_BASE}/embed`);
+      console.log('[DEBUG-EMBED] =============================');
+      
       try {
         const response = await fetch(`${OPENSEARCH_API_BASE}/embed`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: text })
         });
+        
+        console.log('[DEBUG-EMBED] Response status:', response.status);
+        console.log('[DEBUG-EMBED] Response ok:', response.ok);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -1013,6 +1024,11 @@
         return data.embedding;
       } catch (error) {
         console.error('[embed_query] 임베딩 생성 실패:', error);
+        console.error('[DEBUG-EMBED] Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
         alert('임베딩 생성 실패: ' + error.message);
         return null;
       }
@@ -1021,6 +1037,17 @@
     // LLM API 호출 함수
     async function call_llm_api(prompt, model) {
       console.log('[call_llm_api] LLM 호출 시작, model:', model);
+      
+      // 상세 디버깅 정보
+      console.log('[DEBUG] ===== Execution Context =====');
+      console.log('[DEBUG] window.location.href:', window.location.href);
+      console.log('[DEBUG] window.location.origin:', window.location.origin);
+      console.log('[DEBUG] window.location.protocol:', window.location.protocol);
+      console.log('[DEBUG] document.location.origin:', document.location.origin);
+      console.log('[DEBUG] OPENSEARCH_API_BASE:', OPENSEARCH_API_BASE);
+      console.log('[DEBUG] Target URL:', `${OPENSEARCH_API_BASE}/vllm_chat`);
+      console.log('[DEBUG] Request body:', JSON.stringify({ text: prompt.substring(0, 100) + '...', model: model, limit: 4096 }));
+      console.log('[DEBUG] =============================');
       
       try {
         const response = await fetch(`${OPENSEARCH_API_BASE}/vllm_chat`, {
@@ -1035,6 +1062,12 @@
           })
         });
         
+        console.log('[DEBUG] Response received');
+        console.log('[DEBUG] Response status:', response.status);
+        console.log('[DEBUG] Response statusText:', response.statusText);
+        console.log('[DEBUG] Response headers:', [...response.headers.entries()]);
+        console.log('[DEBUG] Response ok:', response.ok);
+        
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -1044,6 +1077,11 @@
         return data.content;
       } catch (error) {
         console.error('[call_llm_api] LLM 호출 실패:', error);
+        console.error('[DEBUG] Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
         alert('LLM 호출 실패: ' + error.message);
         return null;
       }
