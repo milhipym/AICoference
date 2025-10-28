@@ -857,6 +857,7 @@
 
     // ==================== 학습 기능 API ====================
     const OPENSEARCH_API_BASE = "http://10.10.22.81:8080";
+    const DEFAULT_INDEX = "contest_pm_task";
 
     // 임베딩 생성 함수
     async function embed_query(text) {
@@ -883,15 +884,174 @@
       }
     }
 
-    // 1. 인덱스 생성
+    // LLM API 호출 함수
+    async function call_llm_api(prompt, model) {
+      console.log('[call_llm_api] LLM 호출 시작, model:', model);
+      
+      try {
+        const response = await fetch(`${OPENSEARCH_API_BASE}/vllm_chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            text: prompt, 
+            model: model,
+            limit: 4096
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('[call_llm_api] LLM 응답 받음, 길이:', data.content?.length);
+        return data.content;
+      } catch (error) {
+        console.error('[call_llm_api] LLM 호출 실패:', error);
+        alert('LLM 호출 실패: ' + error.message);
+        return null;
+      }
+    }
+
+    // JSON 결과 팝업 생성
+    function createJsonResultPopup(jsonResult, fileName) {
+      const popup = document.createElement('div');
+      popup.id = 'jsonResultPopup';
+      popup.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+      `;
+      
+      popup.innerHTML = `
+        <div style="
+          background: #0a0e27;
+          border: 2px solid #00ffff;
+          border-radius: 10px;
+          padding: 30px;
+          max-width: 90%;
+          max-height: 90%;
+          overflow: auto;
+          box-shadow: 0 0 50px rgba(0, 255, 255, 0.5);
+        ">
+          <h2 style="color: #00ffff; margin-top: 0; text-align: center;">
+            ◆ AI 로그 분석 결과 ◆
+          </h2>
+          <p style="color: #888; text-align: center; margin-bottom: 20px;">
+            파일: ${fileName}
+          </p>
+          <pre style="
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+            border-radius: 5px;
+            overflow: auto;
+            max-height: 50vh;
+            font-size: 12px;
+            border: 1px solid #00ffff;
+          ">${JSON.stringify(jsonResult, null, 2)}</pre>
+          <div style="display: flex; justify-content: center; gap: 20px; margin-top: 30px;">
+            <button id="learnJsonBtn" style="
+              padding: 12px 30px;
+              background: linear-gradient(90deg, #00ff00, #00cc00);
+              color: #000;
+              border: none;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: bold;
+              cursor: pointer;
+              box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            ">학습 하기</button>
+            <button id="closeJsonBtn" style="
+              padding: 12px 30px;
+              background: linear-gradient(90deg, #ff6b6b, #ff0000);
+              color: #fff;
+              border: none;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: bold;
+              cursor: pointer;
+              box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+            ">닫기</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(popup);
+      
+      // 닫기 버튼 이벤트
+      document.getElementById('closeJsonBtn').addEventListener('click', () => {
+        popup.remove();
+      });
+      
+      // 학습 하기 버튼 이벤트
+      document.getElementById('learnJsonBtn').addEventListener('click', async () => {
+        console.log('[learnJsonBtn] JSON 학습 시작');
+        
+        const learnBtn = document.getElementById('learnJsonBtn');
+        learnBtn.disabled = true;
+        learnBtn.textContent = '학습 중...';
+        
+        try {
+          // JSON을 문자열로 변환하여 임베딩
+          const jsonText = JSON.stringify(jsonResult, null, 2);
+          const embedding = await embed_query(jsonText);
+          
+          if (!embedding) {
+            throw new Error('임베딩 생성 실패');
+          }
+          
+          // 인덱스에 삽입
+          const response = await fetch(`${OPENSEARCH_API_BASE}/index`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              index: DEFAULT_INDEX,
+              document: {
+                text: jsonText,
+                embedding: embedding,
+                file_name: fileName,
+                analysis_date: jsonResult.analysis_date || new Date().toISOString().split('T')[0]
+              }
+            })
+          });
+          
+          const result = await response.json();
+          console.log('[learnJsonBtn] 학습 결과:', result);
+          
+          if (result.result === 'created') {
+            alert('학습이 완료되었습니다!\\nDocument ID: ' + result.id);
+            popup.remove();
+          } else {
+            throw new Error('학습 실패');
+          }
+          
+        } catch (error) {
+          console.error('[learnJsonBtn] 학습 중 오류:', error);
+          alert('학습 실패: ' + error.message);
+          learnBtn.disabled = false;
+          learnBtn.textContent = '학습 하기';
+        }
+      });
+    }
+
+    // 1. 인덱스 생성 (contest_pm_task)
     document.addEventListener('DOMContentLoaded', function() {
       const btn1 = document.getElementById('btn_learn_1');
       if (btn1) {
         btn1.addEventListener('click', async function() {
           console.log('[btn_learn_1] 인덱스 생성 버튼 클릭');
           
-          const indexName = prompt('생성할 인덱스 이름을 입력하세요 (contest_XXX 형식):', 'contest_pm_task');
-          if (!indexName) {
+          const indexName = DEFAULT_INDEX;
+          
+          if (!confirm(`인덱스 "${indexName}"를 생성하시겠습니까?`)) {
             console.log('[btn_learn_1] 인덱스 생성 취소됨');
             return;
           }
@@ -911,7 +1071,7 @@
             const result = await response.json();
             console.log('[btn_learn_1] 인덱스 생성 응답:', result);
             
-            alert(result.message || '인덱스 생성 완료');
+            alert(result.message || '인덱스 생성 완료: ' + indexName);
           } catch (error) {
             console.error('[btn_learn_1] 인덱스 생성 실패:', error);
             alert('인덱스 생성 실패: ' + error.message);
@@ -919,24 +1079,106 @@
         });
       }
       
-      // 2. 임베딩 생성 테스트
+      // 2. AI 로그 분석 후 학습
       const btn2 = document.getElementById('btn_learn_2');
       if (btn2) {
         btn2.addEventListener('click', async function() {
-          console.log('[btn_learn_2] 임베딩 생성 버튼 클릭');
+          console.log('[btn_learn_2] AI 로그 분석 버튼 클릭');
           
-          const text = prompt('임베딩을 생성할 텍스트를 입력하세요:', '안녕하세요, 저는 인공지능입니다.');
-          if (!text) {
-            console.log('[btn_learn_2] 임베딩 생성 취소됨');
-            return;
-          }
+          // 파일 업로드 input 생성
+          const fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          fileInput.accept = '.txt,.log';
           
-          const embedding = await embed_query(text);
+          fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            console.log('[btn_learn_2] 파일 선택됨:', file.name);
+            
+            try {
+              // 파일 읽기
+              const logText = await file.text();
+              console.log('[btn_learn_2] 파일 크기:', logText.length, 'bytes');
+              
+              // 분석 날짜 (오늘)
+              const analysisDate = new Date().toISOString().split('T')[0];
+              
+              // LLM 프롬프트 생성
+              const prompt = `로그 데이터를 자세히 분석한 후 다음 JSON 형식으로 답변해주세요.
+
+로그 데이터:
+${logText.substring(0, 50000)}
+
+요청하는 JSON 형식:
+{
+  "analysis_date": "${analysisDate}",
+  "log_file": "${file.name}",
+  "analysis_request": {
+    "로그 분석 인사이트": {
+      "사용자 행동 패턴 분석": {
+        "주요 사용 서비스": "로그에서 '_BIZREQUEST' 필드를 분석하여 가장 많이 사용된 서비스 상위 5개를 식별하고, 각 서비스의 요청 건수를 포함하여 결과를 제시해줘.",
+        "시간대별 사용량": "로그 생성 시간을 기준으로 시간대별(00시, 01시, ..., 23시) 서비스 요청 건수를 분석하고, 사용량이 가장 많은 시간대와 가장 적은 시간대를 알려줘.",
+        "사용자별 서비스 이용 현황": "'PUM_USER_NAME' 필드를 기준으로 가장 요청이 많았던 사용자 상위 3명을 식별하고, 각 사용자의 총 요청 건수를 알려줘.",
+        "기기 정보": "'DEV_MODEL'과 'DEV_TELECOM' 필드를 분석하여 가장 많이 사용된 기기 모델 상위 3개와 통신사별 점유율을 분석해줘."
+      },
+      "서비스 사용 현황 분석": {
+        "요청 건수 및 종류": "로그 파일 전체의 총 요청 건수를 계산하고, 서비스 종류별 요청 건수와 비율을 분석해줘.",
+        "위치 기반 서비스 분석": "'PNM_LOCATION_CD' 필드를 기준으로 지역 코드별 요청 건수를 분석하고, 가장 요청이 많았던 상위 3개 지역을 알려줘.",
+        "월별/일별 통계": "이 로그는 '${analysisDate}'에 해당하는 일일 통계임을 명시하고, 주요 통계(총 요청 수, 상위 서비스)를 요약해줘."
+      },
+      "시스템 성능 및 오류 분석": {
+        "응답 시간": "로그의 타임스탬프를 분석하여 평균 응답 시간을 추정하고, 응답 시간이 유독 길었던(예: 5초 이상) 요청이 있었는지 식별해줘.",
+        "오류 발생 현황": "로그 내용에서 'ERROR' 또는 'Exception' 키워드를 포함한 로그를 찾아내고, 발생한 오류의 종류와 빈도를 요약해줘."
+      }
+    }
+  }
+}
+
+반드시 JSON 형식으로만 답변해주세요.`;
+
+              console.log('[btn_learn_2] LLM API 호출 시작...');
+              alert('AI가 로그를 분석 중입니다...\n시간이 다소 걸릴 수 있습니다.');
+              
+              // LLM API 호출
+              const llmResponse = await call_llm_api(prompt, 'qwen');
+              
+              if (!llmResponse) {
+                throw new Error('LLM 응답을 받지 못했습니다.');
+              }
+              
+              console.log('[btn_learn_2] LLM 응답:', llmResponse);
+              
+              // JSON 파싱 시도
+              let jsonResult;
+              try {
+                // JSON 부분만 추출 (``` 제거)
+                let jsonText = llmResponse;
+                const jsonMatch = llmResponse.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                  jsonText = jsonMatch[0];
+                }
+                jsonResult = JSON.parse(jsonText);
+              } catch (parseError) {
+                console.error('[btn_learn_2] JSON 파싱 실패:', parseError);
+                // 파싱 실패 시 원본 응답을 JSON으로 감싸기
+                jsonResult = {
+                  analysis_date: analysisDate,
+                  log_file: file.name,
+                  raw_response: llmResponse
+                };
+              }
+              
+              // JSON 결과 팝업 표시
+              createJsonResultPopup(jsonResult, file.name);
+              
+            } catch (error) {
+              console.error('[btn_learn_2] AI 분석 중 오류:', error);
+              alert('AI 분석 실패: ' + error.message);
+            }
+          });
           
-          if (embedding) {
-            console.log('[btn_learn_2] 임베딩 결과 (처음 10개):', embedding.slice(0, 10));
-            alert(`임베딩 생성 완료!\n벡터 크기: ${embedding.length}\n처음 3개 값: ${embedding.slice(0, 3).join(', ')}`);
-          }
+          fileInput.click();
         });
       }
       
@@ -1036,21 +1278,269 @@
         });
       }
       
-      // 4, 5번 버튼은 예약
+      // 4. 학습 데이터 검색 (KNN + 키워드)
       const btn4 = document.getElementById('btn_learn_4');
-      const btn5 = document.getElementById('btn_learn_5');
-      
       if (btn4) {
-        btn4.addEventListener('click', function() {
-          console.log('[btn_learn_4] 버튼 4 클릭 (예약됨)');
-          alert('이 기능은 아직 구현되지 않았습니다.');
+        btn4.addEventListener('click', async function() {
+          console.log('[btn_learn_4] 학습 데이터 검색 버튼 클릭');
+          
+          // 검색 타입 선택 팝업
+          const searchPopup = document.createElement('div');
+          searchPopup.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+          `;
+          
+          searchPopup.innerHTML = `
+            <div style="
+              background: #0a0e27;
+              border: 2px solid #00ffff;
+              border-radius: 10px;
+              padding: 30px;
+              min-width: 500px;
+              box-shadow: 0 0 50px rgba(0, 255, 255, 0.5);
+            ">
+              <h2 style="color: #00ffff; margin-top: 0; text-align: center;">
+                ◆ 학습 데이터 검색 ◆
+              </h2>
+              
+              <div style="margin: 20px 0;">
+                <label style="color: #0f0; display: block; margin-bottom: 10px;">검색 타입:</label>
+                <select id="searchType" style="
+                  width: 100%;
+                  padding: 10px;
+                  background: #000;
+                  color: #0f0;
+                  border: 1px solid #00ffff;
+                  border-radius: 5px;
+                  font-size: 14px;
+                ">
+                  <option value="knn">KNN 유사도 검색</option>
+                  <option value="keyword">키워드 검색</option>
+                </select>
+              </div>
+              
+              <div style="margin: 20px 0;">
+                <label style="color: #0f0; display: block; margin-bottom: 10px;">검색어:</label>
+                <input type="text" id="searchQuery" placeholder="검색할 내용을 입력하세요" style="
+                  width: 100%;
+                  padding: 10px;
+                  background: #000;
+                  color: #0f0;
+                  border: 1px solid #00ffff;
+                  border-radius: 5px;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                ">
+              </div>
+              
+              <div style="margin: 20px 0;">
+                <label style="color: #0f0; display: block; margin-bottom: 10px;">결과 개수 (k):</label>
+                <input type="number" id="searchK" value="3" min="1" max="10" style="
+                  width: 100%;
+                  padding: 10px;
+                  background: #000;
+                  color: #0f0;
+                  border: 1px solid #00ffff;
+                  border-radius: 5px;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                ">
+              </div>
+              
+              <div id="searchResults" style="
+                margin: 20px 0;
+                padding: 15px;
+                background: #000;
+                color: #0f0;
+                border: 1px solid #00ffff;
+                border-radius: 5px;
+                max-height: 300px;
+                overflow: auto;
+                display: none;
+              "></div>
+              
+              <div style="display: flex; justify-content: center; gap: 20px; margin-top: 30px;">
+                <button id="executeSearchBtn" style="
+                  padding: 12px 30px;
+                  background: linear-gradient(90deg, #00ff00, #00cc00);
+                  color: #000;
+                  border: none;
+                  border-radius: 8px;
+                  font-size: 16px;
+                  font-weight: bold;
+                  cursor: pointer;
+                  box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+                ">검색 실행</button>
+                <button id="askLlmBtn" style="
+                  padding: 12px 30px;
+                  background: linear-gradient(90deg, #ffaa00, #ff8800);
+                  color: #000;
+                  border: none;
+                  border-radius: 8px;
+                  font-size: 16px;
+                  font-weight: bold;
+                  cursor: pointer;
+                  box-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+                  display: none;
+                ">LLM에게 질문</button>
+                <button id="closeSearchBtn" style="
+                  padding: 12px 30px;
+                  background: linear-gradient(90deg, #ff6b6b, #ff0000);
+                  color: #fff;
+                  border: none;
+                  border-radius: 8px;
+                  font-size: 16px;
+                  font-weight: bold;
+                  cursor: pointer;
+                  box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+                ">닫기</button>
+              </div>
+            </div>
+          `;
+          
+          document.body.appendChild(searchPopup);
+          
+          let searchResultsData = [];
+          
+          // 검색 실행 버튼
+          document.getElementById('executeSearchBtn').addEventListener('click', async () => {
+            const searchType = document.getElementById('searchType').value;
+            const query = document.getElementById('searchQuery').value.trim();
+            const k = parseInt(document.getElementById('searchK').value);
+            
+            if (!query) {
+              alert('검색어를 입력하세요!');
+              return;
+            }
+            
+            console.log('[btn_learn_4] 검색 실행:', searchType, query, k);
+            
+            try {
+              const apiUrl = searchType === 'knn' 
+                ? `${OPENSEARCH_API_BASE}/knn_search`
+                : `${OPENSEARCH_API_BASE}/keyword_search`;
+              
+              const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  text: query,
+                  index: DEFAULT_INDEX,
+                  k: k
+                })
+              });
+              
+              const data = await response.json();
+              searchResultsData = data.result || [];
+              
+              console.log('[btn_learn_4] 검색 결과:', searchResultsData);
+              
+              // 결과 표시
+              const resultsDiv = document.getElementById('searchResults');
+              resultsDiv.style.display = 'block';
+              
+              if (searchResultsData.length === 0) {
+                resultsDiv.innerHTML = '<p>검색 결과가 없습니다.</p>';
+                document.getElementById('askLlmBtn').style.display = 'none';
+              } else {
+                resultsDiv.innerHTML = searchResultsData.map((item, idx) => `
+                  <div style="margin-bottom: 15px; padding: 10px; background: #001a1a; border-left: 3px solid #00ffff;">
+                    <strong style="color: #00ffff;">결과 ${idx + 1}:</strong>
+                    <pre style="white-space: pre-wrap; margin-top: 10px;">${item}</pre>
+                  </div>
+                `).join('');
+                document.getElementById('askLlmBtn').style.display = 'inline-block';
+              }
+              
+            } catch (error) {
+              console.error('[btn_learn_4] 검색 실패:', error);
+              alert('검색 실패: ' + error.message);
+            }
+          });
+          
+          // LLM에게 질문 버튼
+          document.getElementById('askLlmBtn').addEventListener('click', async () => {
+            const query = document.getElementById('searchQuery').value.trim();
+            
+            if (searchResultsData.length === 0) {
+              alert('검색 결과가 없습니다!');
+              return;
+            }
+            
+            console.log('[btn_learn_4] LLM에게 질문 시작');
+            
+            const prompt = searchResultsData.join('\n\n') 
+              + '\n\n위 내용을 참고하여 아래 질문에 답변하세요.\n\n질문: ' + query;
+            
+            try {
+              const llmResponse = await call_llm_api(prompt, 'qwen');
+              
+              if (llmResponse) {
+                alert('LLM 답변:\n\n' + llmResponse);
+                console.log('[btn_learn_4] LLM 답변:', llmResponse);
+              }
+              
+            } catch (error) {
+              console.error('[btn_learn_4] LLM 질문 실패:', error);
+              alert('LLM 질문 실패: ' + error.message);
+            }
+          });
+          
+          // 닫기 버튼
+          document.getElementById('closeSearchBtn').addEventListener('click', () => {
+            searchPopup.remove();
+          });
         });
       }
       
+      // 5. 인덱스 삭제
+      const btn5 = document.getElementById('btn_learn_5');
       if (btn5) {
-        btn5.addEventListener('click', function() {
-          console.log('[btn_learn_5] 버튼 5 클릭 (예약됨)');
-          alert('이 기능은 아직 구현되지 않았습니다.');
+        btn5.addEventListener('click', async function() {
+          console.log('[btn_learn_5] 인덱스 삭제 버튼 클릭');
+          
+          const indexName = prompt('삭제할 인덱스 이름을 입력하세요:', DEFAULT_INDEX);
+          if (!indexName) {
+            console.log('[btn_learn_5] 인덱스 삭제 취소됨');
+            return;
+          }
+          
+          if (!confirm(`정말로 인덱스 "${indexName}"를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다!`)) {
+            console.log('[btn_learn_5] 사용자가 삭제 취소');
+            return;
+          }
+          
+          console.log('[btn_learn_5] 인덱스 삭제 요청:', indexName);
+          
+          try {
+            const response = await fetch(`${OPENSEARCH_API_BASE}/index_delete`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ index: indexName })
+            });
+            
+            const result = await response.json();
+            console.log('[btn_learn_5] 인덱스 삭제 결과:', result);
+            
+            if (result.result && result.result.acknowledged) {
+              alert(`인덱스 "${indexName}" 삭제 완료!`);
+            } else {
+              alert('인덱스 삭제 완료');
+            }
+            
+          } catch (error) {
+            console.error('[btn_learn_5] 인덱스 삭제 실패:', error);
+            alert('인덱스 삭제 실패: ' + error.message);
+          }
         });
       }
     });
