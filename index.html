@@ -1036,8 +1036,9 @@
     }
 
     // LLM API 호출 함수
-    async function call_llm_api(prompt, model, silentMode = false) {
-      console.log('[call_llm_api] LLM 호출 시작, model:', model, 'silentMode:', silentMode);
+    async function call_llm_api(prompt, model, silentMode = false, customLimit = null) {
+      const limit = customLimit !== null ? customLimit : 4096;
+      console.log('[call_llm_api] LLM 호출 시작, model:', model, 'silentMode:', silentMode, 'limit:', limit);
       
       // 상세 디버깅 정보
       console.log('[DEBUG] ===== Execution Context =====');
@@ -1047,7 +1048,7 @@
       console.log('[DEBUG] document.location.origin:', document.location.origin);
       console.log('[DEBUG] OPENSEARCH_API_BASE:', OPENSEARCH_API_BASE);
       console.log('[DEBUG] Target URL:', `${OPENSEARCH_API_BASE}/vllm_chat`);
-      console.log('[DEBUG] Request body:', JSON.stringify({ text: prompt.substring(0, 100) + '...', model: model, limit: 4096 }));
+      console.log('[DEBUG] Request body:', JSON.stringify({ text: prompt.substring(0, 100) + '...', model: model, limit: limit }));
       console.log('[DEBUG] =============================');
       
       try {
@@ -1059,7 +1060,7 @@
           body: JSON.stringify({ 
             text: prompt, 
             model: model,
-            limit: 4096
+            limit: limit
           })
         });
         
@@ -1506,7 +1507,8 @@ ${JSON.stringify(chunkStats, null, 2).substring(0, 8000000)}
 
 반드시 JSON 형식으로만 답변하세요.`;
                 
-                const finalResponse = await call_llm_api(finalPrompt, 'qwen');
+                // 더 긴 응답을 받기 위해 limit 증가 (4096 -> 16384)
+                const finalResponse = await call_llm_api(finalPrompt, 'qwen', false, 16384);
                 
                 if (!finalResponse) {
                   progressPopup.remove();
@@ -2262,7 +2264,8 @@ ${JSON.stringify(summaryStats, null, 2)}
               
               updateProgressPopup(60, 100, 'AI 요약 생성 중...');
               
-              const aiResponse = await call_llm_api(summaryPrompt, 'qwen');
+              // 더 긴 응답을 받기 위해 limit 증가 (4096 -> 16384)
+              const aiResponse = await call_llm_api(summaryPrompt, 'qwen', false, 16384);
               
               if (!aiResponse) {
                 throw new Error('AI 요약 생성 실패');
