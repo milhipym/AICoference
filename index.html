@@ -1274,11 +1274,11 @@
             const fileSizeMB = file.size / (1024 * 1024);
             let useChunkAnalysis = false;
             
-            if (fileSizeMB > 10) {
+            if (fileSizeMB > 9) {
               const choice = confirm(
                 `파일 크기: ${fileSizeMB.toFixed(2)} MB\n\n` +
                 `전체 파일 분석 모드를 사용하시겠습니까?\n\n` +
-                `[확인] 전체 분석 (${Math.ceil(fileSizeMB / 10)}개 청크, 약 ${Math.ceil(fileSizeMB / 10 * 0.3)}분 소요)\n` +
+                `[확인] 전체 분석 (${Math.ceil(fileSizeMB / 9)}개 청크, 약 ${Math.ceil(fileSizeMB / 9 * 0.3)}분 소요)\n` +
                 `[취소] 샘플링 분석 (빠름, 약 1분 소요)`
               );
               useChunkAnalysis = choice;
@@ -1295,7 +1295,7 @@
                 const progressPopup = createProgressPopup(file.name, fileSizeMB);
                 document.body.appendChild(progressPopup);
                 
-                const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB
+                const CHUNK_SIZE = 9 * 1024 * 1024; // 9MB (API 제한 10MB 미만)
                 const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
                 console.log('[btn_learn_2] 총 청크 수:', totalChunks);
                 
@@ -1352,11 +1352,15 @@
                     detailsDiv.scrollTop = detailsDiv.scrollHeight;
                   }
                   
-                  // 청크별 통계 추출 프롬프트 (전체 청크 데이터 사용)
+                  // 청크별 통계 추출 프롬프트 (API 제한을 고려한 크기)
+                  // 프롬프트 자체 + 로그 데이터가 9MB 이하여야 함
+                  const maxLogSize = 8 * 1024 * 1024; // 8MB (프롬프트 텍스트 여유 공간 확보)
+                  const safeChunkText = chunkText.length > maxLogSize ? chunkText.substring(0, maxLogSize) : chunkText;
+                  
                   const chunkPrompt = `다음 로그 데이터에서 통계를 추출하세요. 반드시 JSON 형식으로만 답변하세요.
 
 로그 데이터:
-${chunkText}
+${safeChunkText}
 
 추출할 통계 (JSON 형식):
 {
@@ -1455,7 +1459,7 @@ JSON만 답변하세요.`;
                 const finalPrompt = `다음은 ${totalChunks}개 청크의 통계 데이터입니다. 이를 종합하여 최종 분석 리포트를 JSON 형식으로 작성하세요.
 
 청크 통계:
-${JSON.stringify(chunkStats, null, 2).substring(0, 100000)}
+${JSON.stringify(chunkStats, null, 2).substring(0, 8000000)}
 
 최종 분석 JSON 형식:
 {
@@ -1920,7 +1924,16 @@ ${logForAnalysis}
             
             console.log('[btn_learn_4] LLM에게 질문 시작');
             
-            const prompt = searchResultsData.join('\n\n') 
+            // API 제한을 고려한 안전한 프롬프트 생성 (최대 8MB)
+            const maxContextSize = 8 * 1024 * 1024; // 8MB
+            let combinedResults = searchResultsData.join('\n\n');
+            
+            if (combinedResults.length > maxContextSize) {
+              console.log('[btn_learn_4] 검색 결과가 너무 큼, 잘라냄:', combinedResults.length, '->', maxContextSize);
+              combinedResults = combinedResults.substring(0, maxContextSize) + '\n\n... (결과가 너무 길어 일부만 표시됨)';
+            }
+            
+            const prompt = combinedResults 
               + '\n\n위 내용을 참고하여 아래 질문에 답변하세요.\n\n질문: ' + query;
             
             try {
