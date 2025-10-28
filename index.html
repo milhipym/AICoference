@@ -859,6 +859,139 @@
     const OPENSEARCH_API_BASE = "http://10.10.22.81:8080";
     const DEFAULT_INDEX = "contest_pm_task";
 
+    // 진행률 팝업 생성
+    function createProgressPopup(fileName, fileSizeMB) {
+      const popup = document.createElement('div');
+      popup.id = 'progressPopup';
+      popup.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+      `;
+      
+      popup.innerHTML = `
+        <div style="
+          background: #0a0e27;
+          border: 2px solid #00ffff;
+          border-radius: 10px;
+          padding: 40px;
+          min-width: 600px;
+          box-shadow: 0 0 50px rgba(0, 255, 255, 0.5);
+        ">
+          <h2 style="color: #00ffff; margin-top: 0; text-align: center;">
+            ◆ 전체 파일 분석 중 ◆
+          </h2>
+          <p style="color: #888; text-align: center; margin-bottom: 30px;">
+            파일: ${fileName} (${fileSizeMB.toFixed(2)} MB)
+          </p>
+          
+          <div style="margin: 20px 0;">
+            <div style="
+              background: #000;
+              border: 1px solid #00ffff;
+              border-radius: 10px;
+              height: 30px;
+              overflow: hidden;
+              position: relative;
+            ">
+              <div id="progressBar" style="
+                background: linear-gradient(90deg, #00ff00, #00ffff);
+                height: 100%;
+                width: 0%;
+                transition: width 0.3s;
+                box-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
+              "></div>
+              <div id="progressText" style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: #fff;
+                font-weight: bold;
+                text-shadow: 0 0 5px #000;
+              ">0%</div>
+            </div>
+          </div>
+          
+          <p id="progressStatus" style="
+            color: #0f0;
+            text-align: center;
+            margin: 20px 0;
+            min-height: 20px;
+          ">준비 중...</p>
+          
+          <div id="progressDetails" style="
+            background: #000;
+            border: 1px solid #00ffff;
+            border-radius: 5px;
+            padding: 15px;
+            color: #0f0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 20px 0;
+          "></div>
+          
+          <div style="display: flex; justify-content: center; gap: 20px; margin-top: 30px;">
+            <button id="pauseAnalysisBtn" style="
+              padding: 12px 30px;
+              background: linear-gradient(90deg, #ffaa00, #ff8800);
+              color: #000;
+              border: none;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: bold;
+              cursor: pointer;
+              box-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+            ">⏸ 일시정지</button>
+            <button id="cancelAnalysisBtn" style="
+              padding: 12px 30px;
+              background: linear-gradient(90deg, #ff6b6b, #ff0000);
+              color: #fff;
+              border: none;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: bold;
+              cursor: pointer;
+              box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+            ">✕ 취소</button>
+          </div>
+        </div>
+      `;
+      
+      return popup;
+    }
+
+    // 진행률 업데이트
+    function updateProgressPopup(current, total, status) {
+      const percentage = Math.floor((current / total) * 100);
+      const progressBar = document.getElementById('progressBar');
+      const progressText = document.getElementById('progressText');
+      const progressStatus = document.getElementById('progressStatus');
+      const progressDetails = document.getElementById('progressDetails');
+      
+      if (progressBar) progressBar.style.width = percentage + '%';
+      if (progressText) progressText.textContent = percentage + '%';
+      if (progressStatus) progressStatus.textContent = status;
+      
+      // 상세 로그 추가
+      if (progressDetails) {
+        const now = new Date().toLocaleTimeString();
+        const logLine = document.createElement('div');
+        logLine.textContent = `[${now}] ${status}`;
+        progressDetails.appendChild(logLine);
+        progressDetails.scrollTop = progressDetails.scrollHeight;
+      }
+    }
+
     // 임베딩 생성 함수
     async function embed_query(text) {
       console.log('[embed_query] 임베딩 생성 시작:', text.substring(0, 50) + '...');
@@ -1096,34 +1229,227 @@
             
             console.log('[btn_learn_2] 파일 선택됨:', file.name, '크기:', file.size, 'bytes');
             
+            // 분석 모드 선택
+            const fileSizeMB = file.size / (1024 * 1024);
+            let useChunkAnalysis = false;
+            
+            if (fileSizeMB > 10) {
+              const choice = confirm(
+                `파일 크기: ${fileSizeMB.toFixed(2)} MB\n\n` +
+                `전체 파일 분석 모드를 사용하시겠습니까?\n\n` +
+                `[확인] 전체 분석 (${Math.ceil(fileSizeMB / 10)}개 청크, 약 ${Math.ceil(fileSizeMB / 10 * 0.3)}분 소요)\n` +
+                `[취소] 샘플링 분석 (빠름, 약 1분 소요)`
+              );
+              useChunkAnalysis = choice;
+            }
+            
             try {
-              // 대용량 파일 처리: 처음 100KB만 읽기
-              const SAMPLE_SIZE = 100 * 1024; // 100KB
-              let logSample = '';
-              
-              if (file.size > SAMPLE_SIZE) {
-                console.log('[btn_learn_2] 대용량 파일 감지, 샘플링 시작...');
-                
-                // 파일의 처음 100KB만 읽기
-                const blob = file.slice(0, SAMPLE_SIZE);
-                logSample = await blob.text();
-                
-                console.log('[btn_learn_2] 샘플 크기:', logSample.length, 'bytes');
-                alert(`대용량 파일이 감지되었습니다.\n파일 크기: ${(file.size / (1024*1024)).toFixed(2)} MB\n처음 100KB만 샘플링하여 분석합니다.`);
-              } else {
-                // 작은 파일은 전체 읽기
-                logSample = await file.text();
-                console.log('[btn_learn_2] 전체 파일 읽기 완료:', logSample.length, 'bytes');
-              }
-              
-              // 분석 날짜 (오늘)
               const analysisDate = new Date().toISOString().split('T')[0];
               
-              // LLM 프롬프트 생성 (최대 50000자로 제한)
-              const logForAnalysis = logSample.substring(0, 50000);
-              
-              // LLM 프롬프트 생성
-              const prompt = `로그 데이터를 자세히 분석한 후 다음 JSON 형식으로 답변해주세요.
+              if (useChunkAnalysis) {
+                // ========== 청크 기반 전체 분석 ==========
+                console.log('[btn_learn_2] 청크 기반 전체 분석 시작');
+                
+                // 진행률 팝업 생성
+                const progressPopup = createProgressPopup(file.name, fileSizeMB);
+                document.body.appendChild(progressPopup);
+                
+                const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB
+                const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                console.log('[btn_learn_2] 총 청크 수:', totalChunks);
+                
+                let isPaused = false;
+                let isCancelled = false;
+                const chunkStats = [];
+                
+                // 일시정지 버튼
+                document.getElementById('pauseAnalysisBtn').addEventListener('click', () => {
+                  isPaused = !isPaused;
+                  const btn = document.getElementById('pauseAnalysisBtn');
+                  btn.textContent = isPaused ? '▶ 재개' : '⏸ 일시정지';
+                  console.log('[btn_learn_2] 분석', isPaused ? '일시정지' : '재개');
+                });
+                
+                // 취소 버튼
+                document.getElementById('cancelAnalysisBtn').addEventListener('click', () => {
+                  if (confirm('정말 분석을 취소하시겠습니까?')) {
+                    isCancelled = true;
+                    console.log('[btn_learn_2] 분석 취소됨');
+                  }
+                });
+                
+                // 각 청크 분석
+                for (let i = 0; i < totalChunks; i++) {
+                  // 일시정지 대기
+                  while (isPaused && !isCancelled) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                  }
+                  
+                  // 취소 확인
+                  if (isCancelled) {
+                    progressPopup.remove();
+                    alert('분석이 취소되었습니다.');
+                    return;
+                  }
+                  
+                  const start = i * CHUNK_SIZE;
+                  const end = Math.min(start + CHUNK_SIZE, file.size);
+                  const chunk = file.slice(start, end);
+                  
+                  console.log(`[btn_learn_2] 청크 ${i+1}/${totalChunks} 읽기 시작 (${start}-${end})`);
+                  
+                  // 진행률 업데이트
+                  updateProgressPopup(i + 1, totalChunks, '청크 읽는 중...');
+                  
+                  const chunkText = await chunk.text();
+                  
+                  // 청크별 통계 추출 프롬프트
+                  const chunkPrompt = `다음 로그 데이터에서 통계를 추출하세요. 반드시 JSON 형식으로만 답변하세요.
+
+로그 데이터:
+${chunkText.substring(0, 50000)}
+
+추출할 통계 (JSON 형식):
+{
+  "chunk_number": ${i+1},
+  "total_requests": 0,
+  "bizrequest_services": {},
+  "hourly_usage": {},
+  "users": {},
+  "devices": {},
+  "locations": {},
+  "errors": []
+}
+
+설명:
+- total_requests: _BIZREQUEST가 포함된 라인 수
+- bizrequest_services: {서비스명: 횟수} 형태
+- hourly_usage: {시간대: 횟수} 형태 (00~23시)
+- users: {사용자명: 횟수} 형태 (PUM_USER_NAME)
+- devices: {기기모델: 횟수} 형태 (DEV_MODEL)
+- locations: {지역코드: 횟수} 형태 (PNM_LOCATION_CD)
+- errors: [에러메시지들] 형태 (ERROR, Exception 포함)
+
+JSON만 답변하세요.`;
+                  
+                  updateProgressPopup(i + 1, totalChunks, `청크 ${i+1} 분석 중...`);
+                  
+                  try {
+                    const chunkResponse = await call_llm_api(chunkPrompt, 'qwen');
+                    
+                    if (chunkResponse) {
+                      // JSON 파싱
+                      let chunkStat;
+                      try {
+                        const jsonMatch = chunkResponse.match(/\{[\s\S]*\}/);
+                        if (jsonMatch) {
+                          chunkStat = JSON.parse(jsonMatch[0]);
+                        } else {
+                          chunkStat = JSON.parse(chunkResponse);
+                        }
+                        chunkStats.push(chunkStat);
+                        console.log(`[btn_learn_2] 청크 ${i+1} 분석 완료:`, chunkStat);
+                      } catch (parseError) {
+                        console.error(`[btn_learn_2] 청크 ${i+1} JSON 파싱 실패:`, parseError);
+                        chunkStats.push({ chunk_number: i+1, error: 'JSON 파싱 실패', raw: chunkResponse });
+                      }
+                    }
+                  } catch (error) {
+                    console.error(`[btn_learn_2] 청크 ${i+1} 분석 실패:`, error);
+                    chunkStats.push({ chunk_number: i+1, error: error.message });
+                  }
+                  
+                  updateProgressPopup(i + 1, totalChunks, `청크 ${i+1}/${totalChunks} 완료`);
+                }
+                
+                // 최종 종합 분석
+                console.log('[btn_learn_2] 모든 청크 분석 완료, 최종 종합 시작');
+                updateProgressPopup(totalChunks, totalChunks, '최종 종합 분석 중...');
+                
+                const finalPrompt = `다음은 ${totalChunks}개 청크의 통계 데이터입니다. 이를 종합하여 최종 분석 리포트를 JSON 형식으로 작성하세요.
+
+청크 통계:
+${JSON.stringify(chunkStats, null, 2).substring(0, 100000)}
+
+최종 분석 JSON 형식:
+{
+  "analysis_date": "${analysisDate}",
+  "log_file": "${file.name}",
+  "total_file_size_mb": ${fileSizeMB.toFixed(2)},
+  "total_chunks_analyzed": ${totalChunks},
+  "analysis_request": {
+    "로그 분석 인사이트": {
+      "사용자 행동 패턴 분석": {
+        "주요 사용 서비스": "모든 청크의 bizrequest_services를 합산하여 상위 5개 서비스와 요청 건수",
+        "시간대별 사용량": "모든 청크의 hourly_usage를 합산하여 시간대별 분포",
+        "사용자별 서비스 이용 현황": "모든 청크의 users를 합산하여 상위 3명",
+        "기기 정보": "모든 청크의 devices를 합산하여 상위 3개 기기"
+      },
+      "서비스 사용 현황 분석": {
+        "총 요청 건수": "모든 청크의 total_requests 합계",
+        "위치 기반 서비스 분석": "모든 청크의 locations를 합산하여 상위 3개 지역",
+        "일일 통계": "전체 요청 수와 주요 서비스 요약"
+      },
+      "시스템 성능 및 오류 분석": {
+        "오류 발생 현황": "모든 청크의 errors를 종합하여 오류 종류와 빈도"
+      }
+    }
+  }
+}
+
+반드시 JSON 형식으로만 답변하세요.`;
+                
+                const finalResponse = await call_llm_api(finalPrompt, 'qwen');
+                
+                progressPopup.remove();
+                
+                if (!finalResponse) {
+                  throw new Error('최종 종합 분석 실패');
+                }
+                
+                console.log('[btn_learn_2] 최종 LLM 응답:', finalResponse);
+                
+                // JSON 파싱
+                let jsonResult;
+                try {
+                  const jsonMatch = finalResponse.match(/\{[\s\S]*\}/);
+                  if (jsonMatch) {
+                    jsonResult = JSON.parse(jsonMatch[0]);
+                  } else {
+                    jsonResult = JSON.parse(finalResponse);
+                  }
+                } catch (parseError) {
+                  console.error('[btn_learn_2] 최종 JSON 파싱 실패:', parseError);
+                  jsonResult = {
+                    analysis_date: analysisDate,
+                    log_file: file.name,
+                    raw_response: finalResponse,
+                    chunk_stats: chunkStats
+                  };
+                }
+                
+                // 결과 팝업 표시
+                createJsonResultPopup(jsonResult, file.name);
+                
+              } else {
+                // ========== 기존 샘플링 분석 ==========
+                console.log('[btn_learn_2] 샘플링 분석 시작');
+                
+                const SAMPLE_SIZE = 100 * 1024; // 100KB
+                let logSample = '';
+                
+                if (file.size > SAMPLE_SIZE) {
+                  const blob = file.slice(0, SAMPLE_SIZE);
+                  logSample = await blob.text();
+                  console.log('[btn_learn_2] 샘플 크기:', logSample.length, 'bytes');
+                } else {
+                  logSample = await file.text();
+                  console.log('[btn_learn_2] 전체 파일 읽기 완료:', logSample.length, 'bytes');
+                }
+                
+                const logForAnalysis = logSample.substring(0, 50000);
+                
+                const prompt = `로그 데이터를 자세히 분석한 후 다음 JSON 형식으로 답변해주세요.
 
 로그 데이터 (샘플):
 ${logForAnalysis}
@@ -1189,6 +1515,7 @@ ${logForAnalysis}
               
               // JSON 결과 팝업 표시
               createJsonResultPopup(jsonResult, file.name);
+              }
               
             } catch (error) {
               console.error('[btn_learn_2] AI 분석 중 오류:', error);
