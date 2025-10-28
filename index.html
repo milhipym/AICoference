@@ -126,6 +126,7 @@
           <button id="btn_learn_3" class="hidden-btn" title="데이터 삽입">3</button>
           <button id="btn_learn_4" class="hidden-btn" title="예약 기능">4</button>
           <button id="btn_learn_5" class="hidden-btn" title="예약 기능">5</button>
+          <button id="btn_learn_6" class="hidden-btn" title="로컬 전처리 분석">6</button>
         </div>
         
         <button class="detail-close-btn" onclick="closeDetailPopup()">✕ CLOSE</button>
@@ -1996,6 +1997,316 @@ ${logForAnalysis}
             console.error('[btn_learn_5] 인덱스 삭제 실패:', error);
             alert('인덱스 삭제 실패: ' + error.message);
           }
+        });
+      }
+      
+      // 6. 로컬 전처리 후 AI 요약 (빠른 분석)
+      const btn6 = document.getElementById('btn_learn_6');
+      if (btn6) {
+        btn6.addEventListener('click', async function() {
+          console.log('[btn_learn_6] 로컬 전처리 분석 버튼 클릭');
+          
+          // 파일 업로드 input 생성
+          const fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          fileInput.accept = '.txt,.log';
+          
+          fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const fileSizeMB = file.size / (1024 * 1024);
+            console.log('[btn_learn_6] 파일 선택됨:', file.name, '크기:', fileSizeMB.toFixed(2), 'MB');
+            
+            if (!confirm(`파일: ${file.name}\n크기: ${fileSizeMB.toFixed(2)} MB\n\n로컬 전처리 분석을 시작하시겠습니까?\n(JavaScript로 직접 통계 계산 후 AI 요약)`)) {
+              return;
+            }
+            
+            try {
+              // 진행률 팝업 생성
+              const progressPopup = createProgressPopup(file.name, fileSizeMB);
+              document.body.appendChild(progressPopup);
+              
+              updateProgressPopup(0, 100, '파일 읽기 시작...');
+              
+              // === 1단계: 로컬 통계 계산 ===
+              console.log('[btn_learn_6] 1단계: 로컬 통계 계산 시작');
+              
+              const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB 청크로 읽기 (메모리 효율)
+              const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+              
+              // 통계 데이터 초기화
+              const stats = {
+                fileName: file.name,
+                fileSizeMB: fileSizeMB.toFixed(2),
+                totalLines: 0,
+                totalRequests: 0,
+                bizrequestServices: {},
+                hourlyUsage: {},
+                users: {},
+                devices: {},
+                locations: {},
+                errors: [],
+                dateRange: { start: null, end: null }
+              };
+              
+              let buffer = ''; // 청크 경계 처리용 버퍼
+              
+              // 각 청크를 순차적으로 읽으면서 통계 계산
+              for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                const chunk = file.slice(start, end);
+                
+                updateProgressPopup(
+                  Math.floor((i / totalChunks) * 50), 
+                  100, 
+                  `통계 계산 중... (${i+1}/${totalChunks} 청크)`
+                );
+                
+                const chunkText = await chunk.text();
+                const fullText = buffer + chunkText;
+                
+                // 마지막 줄이 불완전할 수 있으므로 버퍼에 저장
+                const lastNewlineIndex = fullText.lastIndexOf('\n');
+                const processText = lastNewlineIndex !== -1 ? fullText.substring(0, lastNewlineIndex) : fullText;
+                buffer = lastNewlineIndex !== -1 ? fullText.substring(lastNewlineIndex + 1) : '';
+                
+                // 줄 단위로 통계 계산
+                const lines = processText.split('\n');
+                stats.totalLines += lines.length;
+                
+                for (const line of lines) {
+                  if (!line.trim()) continue;
+                  
+                  // BIZREQUEST 카운트
+                  if (line.includes('_BIZREQUEST')) {
+                    stats.totalRequests++;
+                    
+                    // 서비스명 추출 (예: pm.service.XXX)
+                    const serviceMatch = line.match(/pm\.service\.(\w+)/);
+                    if (serviceMatch) {
+                      const serviceName = serviceMatch[1];
+                      stats.bizrequestServices[serviceName] = (stats.bizrequestServices[serviceName] || 0) + 1;
+                    }
+                  }
+                  
+                  // 시간대 추출 (예: 2024-01-15 14:23:45)
+                  const timeMatch = line.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}):/);
+                  if (timeMatch) {
+                    const date = timeMatch[1];
+                    const hour = timeMatch[2];
+                    
+                    // 날짜 범위 업데이트
+                    if (!stats.dateRange.start || date < stats.dateRange.start) {
+                      stats.dateRange.start = date;
+                    }
+                    if (!stats.dateRange.end || date > stats.dateRange.end) {
+                      stats.dateRange.end = date;
+                    }
+                    
+                    // 시간대별 사용량
+                    stats.hourlyUsage[hour] = (stats.hourlyUsage[hour] || 0) + 1;
+                  }
+                  
+                  // 사용자명 추출 (PUM_USER_NAME)
+                  const userMatch = line.match(/PUM_USER_NAME[=:]\s*([^\s,\]]+)/);
+                  if (userMatch) {
+                    const userName = userMatch[1];
+                    stats.users[userName] = (stats.users[userName] || 0) + 1;
+                  }
+                  
+                  // 기기 모델 추출 (DEV_MODEL)
+                  const deviceMatch = line.match(/DEV_MODEL[=:]\s*([^\s,\]]+)/);
+                  if (deviceMatch) {
+                    const deviceModel = deviceMatch[1];
+                    stats.devices[deviceModel] = (stats.devices[deviceModel] || 0) + 1;
+                  }
+                  
+                  // 지역 코드 추출 (PNM_LOCATION_CD)
+                  const locationMatch = line.match(/PNM_LOCATION_CD[=:]\s*([^\s,\]]+)/);
+                  if (locationMatch) {
+                    const locationCode = locationMatch[1];
+                    stats.locations[locationCode] = (stats.locations[locationCode] || 0) + 1;
+                  }
+                  
+                  // 에러 추출 (ERROR, Exception 포함)
+                  if (line.match(/ERROR|Exception|exception|FAIL|fail/i)) {
+                    // 에러 메시지 추출 (너무 길면 자르기)
+                    const errorMsg = line.trim().substring(0, 200);
+                    if (stats.errors.length < 50) { // 최대 50개까지만 저장
+                      stats.errors.push(errorMsg);
+                    }
+                  }
+                }
+                
+                // 진행 로그
+                const detailsDiv = document.getElementById('progressDetails');
+                if (detailsDiv) {
+                  const time = new Date().toLocaleTimeString();
+                  detailsDiv.innerHTML += `[${time}] 청크 ${i+1}/${totalChunks} 처리 완료 (누적 라인: ${stats.totalLines.toLocaleString()})<br>`;
+                  detailsDiv.scrollTop = detailsDiv.scrollHeight;
+                }
+              }
+              
+              // 마지막 버퍼 처리
+              if (buffer.trim()) {
+                stats.totalLines++;
+              }
+              
+              console.log('[btn_learn_6] 로컬 통계 계산 완료:', stats);
+              updateProgressPopup(50, 100, '로컬 통계 계산 완료! AI 요약 요청 중...');
+              
+              // 진행 로그
+              const detailsDiv = document.getElementById('progressDetails');
+              if (detailsDiv) {
+                const time = new Date().toLocaleTimeString();
+                detailsDiv.innerHTML += `<br>[${time}] ✅ 로컬 통계 계산 완료!<br>`;
+                detailsDiv.innerHTML += `[${time}] 📊 총 ${stats.totalLines.toLocaleString()} 라인 분석<br>`;
+                detailsDiv.innerHTML += `[${time}] 🔄 AI 요약 생성 시작...<br>`;
+                detailsDiv.scrollTop = detailsDiv.scrollHeight;
+              }
+              
+              // === 2단계: AI 요약 생성 ===
+              console.log('[btn_learn_6] 2단계: AI 요약 생성 시작');
+              
+              // 상위 N개만 추출
+              const topN = (obj, n) => {
+                return Object.entries(obj)
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, n)
+                  .reduce((acc, [key, val]) => ({ ...acc, [key]: val }), {});
+              };
+              
+              // 요약용 통계 데이터
+              const summaryStats = {
+                fileName: stats.fileName,
+                fileSizeMB: stats.fileSizeMB,
+                totalLines: stats.totalLines,
+                totalRequests: stats.totalRequests,
+                dateRange: stats.dateRange,
+                topServices: topN(stats.bizrequestServices, 10),
+                hourlyUsage: stats.hourlyUsage,
+                topUsers: topN(stats.users, 10),
+                topDevices: topN(stats.devices, 10),
+                topLocations: topN(stats.locations, 10),
+                errorSamples: stats.errors.slice(0, 20) // 대표 에러 20개
+              };
+              
+              // AI 요약 프롬프트
+              const summaryPrompt = `다음은 로그 파일의 통계 분석 결과입니다. 이를 기반으로 인사이트 있는 분석 리포트를 JSON 형식으로 작성하세요.
+
+통계 데이터:
+${JSON.stringify(summaryStats, null, 2)}
+
+아래 형식으로 JSON 응답을 작성하세요:
+{
+  "analysis_summary": {
+    "overview": "로그 파일 전체 요약 (파일명, 기간, 총 라인 수, 총 요청 수)",
+    "key_insights": [
+      "주요 인사이트 1",
+      "주요 인사이트 2",
+      "주요 인사이트 3"
+    ]
+  },
+  "service_analysis": {
+    "most_used_services": "가장 많이 사용된 서비스 상위 5개와 사용량",
+    "service_distribution": "서비스 사용 분포에 대한 설명"
+  },
+  "temporal_analysis": {
+    "peak_hours": "최고 사용 시간대 (상위 3개 시간)",
+    "usage_pattern": "시간대별 사용 패턴 설명",
+    "date_range": "분석 기간"
+  },
+  "user_analysis": {
+    "active_users": "가장 활발한 사용자 상위 3명과 사용량",
+    "user_distribution": "사용자 분포 특징"
+  },
+  "device_analysis": {
+    "popular_devices": "주요 기기 모델 상위 3개",
+    "device_insight": "기기 사용 패턴"
+  },
+  "location_analysis": {
+    "main_locations": "주요 지역 상위 3개",
+    "location_insight": "지역별 사용 특징"
+  },
+  "error_analysis": {
+    "error_count": "에러 샘플 수",
+    "error_patterns": "주요 에러 패턴 및 유형",
+    "recommendations": "권장 조치사항"
+  },
+  "recommendations": [
+    "개선 제안 1",
+    "개선 제안 2",
+    "개선 제안 3"
+  ]
+}
+
+반드시 JSON 형식으로만 답변하세요. 추가 설명은 불필요합니다.`;
+              
+              updateProgressPopup(60, 100, 'AI 요약 생성 중...');
+              
+              const aiResponse = await call_llm_api(summaryPrompt, 'qwen');
+              
+              if (!aiResponse) {
+                throw new Error('AI 요약 생성 실패');
+              }
+              
+              console.log('[btn_learn_6] AI 요약 완료');
+              updateProgressPopup(100, 100, '분석 완료!');
+              
+              if (detailsDiv) {
+                const time = new Date().toLocaleTimeString();
+                detailsDiv.innerHTML += `[${time}] ✅ AI 요약 생성 완료!<br>`;
+                detailsDiv.scrollTop = detailsDiv.scrollHeight;
+              }
+              
+              // === 3단계: 결과 표시 ===
+              setTimeout(() => {
+                progressPopup.remove();
+                
+                // JSON 파싱
+                let analysisResult;
+                try {
+                  const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+                  if (jsonMatch) {
+                    analysisResult = JSON.parse(jsonMatch[0]);
+                  } else {
+                    analysisResult = JSON.parse(aiResponse);
+                  }
+                } catch (parseError) {
+                  console.error('[btn_learn_6] JSON 파싱 실패:', parseError);
+                  analysisResult = { raw_response: aiResponse };
+                }
+                
+                // 결과 팝업 생성 (btn_learn_2와 동일한 형식)
+                const combinedResult = {
+                  local_statistics: summaryStats,
+                  ai_analysis: analysisResult,
+                  processing_info: {
+                    method: 'Local preprocessing + AI summary',
+                    total_chunks_processed: totalChunks,
+                    processing_time: '약 2~5분',
+                    file_size_mb: fileSizeMB.toFixed(2)
+                  }
+                };
+                
+                createJsonResultPopup(combinedResult, file.name);
+                
+                console.log('[btn_learn_6] 전체 분석 완료!');
+                
+              }, 1000);
+              
+            } catch (error) {
+              console.error('[btn_learn_6] 분석 실패:', error);
+              alert('분석 실패: ' + error.message);
+              
+              const popup = document.getElementById('progressPopup');
+              if (popup) popup.remove();
+            }
+          });
+          
+          fileInput.click();
         });
       }
     });
