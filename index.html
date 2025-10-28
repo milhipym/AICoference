@@ -2053,9 +2053,25 @@ ${logForAnalysis}
               const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB 청크로 읽기 (메모리 효율)
               const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
               
+              // 파일명에서 날짜 추출 (예: SystemOut_20251030.log -> 2025년 10월 30일)
+              let logDate = null;
+              let logDateFormatted = null;
+              const dateMatch = file.name.match(/(\d{8})/); // YYYYMMDD 형식 찾기
+              if (dateMatch) {
+                const dateStr = dateMatch[1];
+                const year = dateStr.substring(0, 4);
+                const month = dateStr.substring(4, 6);
+                const day = dateStr.substring(6, 8);
+                logDate = `${year}-${month}-${day}`;
+                logDateFormatted = `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
+                console.log('[btn_learn_6] 파일명에서 추출한 날짜:', logDate, logDateFormatted);
+              }
+              
               // 통계 데이터 초기화
               const stats = {
                 fileName: file.name,
+                logDate: logDate, // YYYY-MM-DD 형식
+                logDateFormatted: logDateFormatted, // 한국어 형식
                 fileSizeMB: fileSizeMB.toFixed(2),
                 totalLines: 0,
                 totalRequests: 0,
@@ -2199,6 +2215,8 @@ ${logForAnalysis}
               // 요약용 통계 데이터
               const summaryStats = {
                 fileName: stats.fileName,
+                logDate: stats.logDate,
+                logDateFormatted: stats.logDateFormatted,
                 fileSizeMB: stats.fileSizeMB,
                 totalLines: stats.totalLines,
                 totalRequests: stats.totalRequests,
@@ -2212,55 +2230,73 @@ ${logForAnalysis}
               };
               
               // AI 요약 프롬프트
-              const summaryPrompt = `다음은 로그 파일의 통계 분석 결과입니다. 이를 기반으로 인사이트 있는 분석 리포트를 JSON 형식으로 작성하세요.
+              const summaryPrompt = `당신은 한국어 로그 분석 전문가입니다. 다음은 "${stats.logDateFormatted || '날짜 미상'}" 로그 파일의 통계 분석 결과입니다. 
+이를 기반으로 인사이트 있는 분석 리포트를 **반드시 한국어**로 JSON 형식으로 작성하세요.
+
+**중요: 모든 설명과 분석 내용은 한국어로 작성해야 합니다.**
 
 통계 데이터:
 ${JSON.stringify(summaryStats, null, 2)}
 
 아래 형식으로 JSON 응답을 작성하세요:
 {
+  "log_date": "${stats.logDate || '날짜 미상'}",
+  "log_date_formatted": "${stats.logDateFormatted || '날짜 미상'}",
+  "file_name": "${stats.fileName}",
   "analysis_summary": {
-    "overview": "로그 파일 전체 요약 (파일명, 기간, 총 라인 수, 총 요청 수)",
+    "overview": "이 로그는 ${stats.logDateFormatted || '날짜 미상'}의 데이터입니다. 총 라인 수, 총 요청 수 등을 포함한 전체 요약을 한국어로 작성",
     "key_insights": [
-      "주요 인사이트 1",
-      "주요 인사이트 2",
-      "주요 인사이트 3"
+      "주요 인사이트 1 (한국어)",
+      "주요 인사이트 2 (한국어)",
+      "주요 인사이트 3 (한국어)"
     ]
   },
   "service_analysis": {
-    "most_used_services": "가장 많이 사용된 서비스 상위 5개와 사용량",
-    "service_distribution": "서비스 사용 분포에 대한 설명"
+    "most_used_services": "가장 많이 사용된 서비스 상위 5개와 사용량을 한국어로 설명",
+    "service_distribution": "서비스 사용 분포에 대한 한국어 설명"
   },
   "temporal_analysis": {
-    "peak_hours": "최고 사용 시간대 (상위 3개 시간)",
-    "usage_pattern": "시간대별 사용 패턴 설명",
-    "date_range": "분석 기간"
+    "peak_hours": "최고 사용 시간대 (예: 08시, 09시, 10시)를 한국어로 설명",
+    "usage_pattern": "시간대별 사용 패턴을 한국어로 상세 설명",
+    "date_range": "${stats.logDateFormatted || '날짜 미상'}의 로그 데이터"
   },
   "user_analysis": {
-    "active_users": "가장 활발한 사용자 상위 3명과 사용량",
-    "user_distribution": "사용자 분포 특징"
+    "active_users": "가장 활발한 사용자 상위 3명과 사용량을 한국어로 설명",
+    "user_distribution": "사용자 분포 특징을 한국어로 설명"
   },
   "device_analysis": {
-    "popular_devices": "주요 기기 모델 상위 3개",
-    "device_insight": "기기 사용 패턴"
+    "popular_devices": "주요 기기 모델 상위 3개를 한국어로 설명",
+    "device_insight": "기기 사용 패턴을 한국어로 설명"
   },
   "location_analysis": {
-    "main_locations": "주요 지역 상위 3개",
-    "location_insight": "지역별 사용 특징"
+    "main_locations": "주요 지역 코드 상위 3개를 한국어로 설명",
+    "location_insight": "지역별 사용 특징을 한국어로 설명"
   },
   "error_analysis": {
-    "error_count": "에러 샘플 수",
-    "error_patterns": "주요 에러 패턴 및 유형",
-    "recommendations": "권장 조치사항"
+    "error_count": "에러 샘플 수 (숫자)",
+    "error_patterns": "주요 에러 패턴 및 유형을 한국어로 설명",
+    "recommendations": "권장 조치사항을 한국어로 설명"
   },
   "recommendations": [
-    "개선 제안 1",
-    "개선 제안 2",
-    "개선 제안 3"
-  ]
+    "개선 제안 1 (한국어)",
+    "개선 제안 2 (한국어)",
+    "개선 제안 3 (한국어)"
+  ],
+  "searchable_info": {
+    "date": "${stats.logDate}",
+    "date_kr": "${stats.logDateFormatted}",
+    "purpose": "이 정보는 '${stats.logDateFormatted}에는 어떤 에러가 있었어?' 같은 날짜별 검색을 위한 메타데이터입니다."
+  }
 }
 
-반드시 JSON 형식으로만 답변하세요. 추가 설명은 불필요합니다.`;
+**필수 요구사항:**
+1. 모든 설명과 분석은 반드시 한국어로 작성
+2. 날짜 정보(log_date, log_date_formatted)를 명확히 포함
+3. 로그 내용 자체(에러 메시지 등)는 원문 유지
+4. 분석과 인사이트는 한국어로 상세하게 작성
+5. 이 데이터는 OpenSearch에 저장되어 날짜별 검색에 사용됩니다
+
+반드시 JSON 형식으로만 답변하세요.`;
               
               updateProgressPopup(60, 100, 'AI 요약 생성 중...');
               
