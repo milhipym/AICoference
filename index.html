@@ -1094,21 +1094,39 @@
             const file = e.target.files[0];
             if (!file) return;
             
-            console.log('[btn_learn_2] 파일 선택됨:', file.name);
+            console.log('[btn_learn_2] 파일 선택됨:', file.name, '크기:', file.size, 'bytes');
             
             try {
-              // 파일 읽기
-              const logText = await file.text();
-              console.log('[btn_learn_2] 파일 크기:', logText.length, 'bytes');
+              // 대용량 파일 처리: 처음 100KB만 읽기
+              const SAMPLE_SIZE = 100 * 1024; // 100KB
+              let logSample = '';
+              
+              if (file.size > SAMPLE_SIZE) {
+                console.log('[btn_learn_2] 대용량 파일 감지, 샘플링 시작...');
+                
+                // 파일의 처음 100KB만 읽기
+                const blob = file.slice(0, SAMPLE_SIZE);
+                logSample = await blob.text();
+                
+                console.log('[btn_learn_2] 샘플 크기:', logSample.length, 'bytes');
+                alert(`대용량 파일이 감지되었습니다.\n파일 크기: ${(file.size / (1024*1024)).toFixed(2)} MB\n처음 100KB만 샘플링하여 분석합니다.`);
+              } else {
+                // 작은 파일은 전체 읽기
+                logSample = await file.text();
+                console.log('[btn_learn_2] 전체 파일 읽기 완료:', logSample.length, 'bytes');
+              }
               
               // 분석 날짜 (오늘)
               const analysisDate = new Date().toISOString().split('T')[0];
               
+              // LLM 프롬프트 생성 (최대 50000자로 제한)
+              const logForAnalysis = logSample.substring(0, 50000);
+              
               // LLM 프롬프트 생성
               const prompt = `로그 데이터를 자세히 분석한 후 다음 JSON 형식으로 답변해주세요.
 
-로그 데이터:
-${logText.substring(0, 50000)}
+로그 데이터 (샘플):
+${logForAnalysis}
 
 요청하는 JSON 형식:
 {
