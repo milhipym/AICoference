@@ -1036,8 +1036,8 @@
     }
 
     // LLM API 호출 함수
-    async function call_llm_api(prompt, model) {
-      console.log('[call_llm_api] LLM 호출 시작, model:', model);
+    async function call_llm_api(prompt, model, silentMode = false) {
+      console.log('[call_llm_api] LLM 호출 시작, model:', model, 'silentMode:', silentMode);
       
       // 상세 디버깅 정보
       console.log('[DEBUG] ===== Execution Context =====');
@@ -1083,7 +1083,11 @@
           message: error.message,
           stack: error.stack
         });
-        alert('LLM 호출 실패: ' + error.message);
+        
+        // silentMode가 false일 때만 alert 표시
+        if (!silentMode) {
+          alert('LLM 호출 실패: ' + error.message);
+        }
         return null;
       }
     }
@@ -1396,7 +1400,7 @@ JSON만 답변하세요.`;
                       detailsDiv.scrollTop = detailsDiv.scrollHeight;
                     }
                     
-                    const chunkResponse = await call_llm_api(chunkPrompt, 'qwen');
+                    const chunkResponse = await call_llm_api(chunkPrompt, 'qwen', true); // silentMode = true (에러 알림 무시)
                     
                     if (chunkResponse) {
                       // JSON 파싱
@@ -1428,15 +1432,27 @@ JSON만 답변하세요.`;
                           detailsDiv.scrollTop = detailsDiv.scrollHeight;
                         }
                       }
+                    } else {
+                      // 응답이 null인 경우 (500 에러, fetch 실패 등)
+                      console.warn(`[btn_learn_2] 청크 ${i+1} 응답 없음, 건너뜀`);
+                      chunkStats.push({ chunk_number: i+1, error: 'API 호출 실패 (무시됨)', skipped: true });
+                      
+                      // 건너뛰기 로그
+                      if (detailsDiv) {
+                        const time = new Date().toLocaleTimeString();
+                        detailsDiv.innerHTML += `[${time}] ⏭️ 청크 ${i+1} 건너뜀 (API 오류, 계속 진행)<br>`;
+                        detailsDiv.scrollTop = detailsDiv.scrollHeight;
+                      }
                     }
                   } catch (error) {
-                    console.error(`[btn_learn_2] 청크 ${i+1} 분석 실패:`, error);
-                    chunkStats.push({ chunk_number: i+1, error: error.message });
+                    // try-catch로 잡힌 예외도 무시하고 계속 진행
+                    console.warn(`[btn_learn_2] 청크 ${i+1} 예외 발생, 무시하고 계속:`, error);
+                    chunkStats.push({ chunk_number: i+1, error: error.message, skipped: true });
                     
-                    // 에러 로그
+                    // 건너뛰기 로그 (경고 수준)
                     if (detailsDiv) {
                       const time = new Date().toLocaleTimeString();
-                      detailsDiv.innerHTML += `[${time}] ❌ 청크 ${i+1} 분석 실패: ${error.message}<br>`;
+                      detailsDiv.innerHTML += `[${time}] ⏭️ 청크 ${i+1} 건너뜀 (${error.message})<br>`;
                       detailsDiv.scrollTop = detailsDiv.scrollHeight;
                     }
                   }
