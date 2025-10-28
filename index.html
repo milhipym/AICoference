@@ -1000,6 +1000,7 @@
       try {
         const response = await fetch(`${OPENSEARCH_API_BASE}/embed`, {
           method: 'POST',
+          mode: 'cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: text })
         });
@@ -1025,7 +1026,10 @@
       try {
         const response = await fetch(`${OPENSEARCH_API_BASE}/vllm_chat`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          mode: 'cors',  // CORS 명시적 설정
+          headers: { 
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify({ 
             text: prompt, 
             model: model,
@@ -1145,6 +1149,7 @@
           // 인덱스에 삽입
           const response = await fetch(`${OPENSEARCH_API_BASE}/index`, {
             method: 'POST',
+            mode: 'cors',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               index: DEFAULT_INDEX,
@@ -1195,6 +1200,7 @@
           try {
             const response = await fetch(`${OPENSEARCH_API_BASE}/index_create`, {
               method: 'POST',
+              mode: 'cors',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
                 index: indexName, 
@@ -1833,6 +1839,7 @@ ${logForAnalysis}
               
               const response = await fetch(apiUrl, {
                 method: 'POST',
+                mode: 'cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   text: query,
@@ -1926,6 +1933,7 @@ ${logForAnalysis}
           try {
             const response = await fetch(`${OPENSEARCH_API_BASE}/index_delete`, {
               method: 'POST',
+              mode: 'cors',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ index: indexName })
             });
