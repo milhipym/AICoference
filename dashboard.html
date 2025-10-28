@@ -137,7 +137,76 @@
 
     .chart-wrapper {
       position: relative;
-      height: 400px;
+      height: 250px;
+    }
+    
+    .jarvis-analysis {
+      background: linear-gradient(135deg, rgba(0, 255, 255, 0.1), rgba(0, 217, 255, 0.05));
+      border: 2px solid rgba(0, 255, 255, 0.5);
+      border-radius: 15px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 0 40px rgba(0, 255, 255, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .jarvis-analysis::before {
+      content: '🤖 JARVIS AI ANALYSIS';
+      display: block;
+      font-size: 14px;
+      color: #00ffff;
+      font-weight: bold;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    
+    .jarvis-content {
+      font-size: 16px;
+      line-height: 1.8;
+      color: #e0e0e0;
+    }
+    
+    .jarvis-content h4 {
+      color: #00ffff;
+      font-size: 18px;
+      margin: 20px 0 10px 0;
+      text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+    }
+    
+    .jarvis-content ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    
+    .jarvis-content li {
+      padding: 8px 0;
+      padding-left: 25px;
+      position: relative;
+    }
+    
+    .jarvis-content li::before {
+      content: '▸';
+      position: absolute;
+      left: 0;
+      color: #00ffff;
+      font-size: 18px;
+    }
+    
+    .jarvis-content .highlight {
+      color: #00ffff;
+      font-weight: bold;
+    }
+    
+    .jarvis-content .warning {
+      color: #ffaa00;
+      font-weight: bold;
+    }
+    
+    .jarvis-content .critical {
+      color: #ff6b6b;
+      font-weight: bold;
     }
 
     .loading {
@@ -223,6 +292,13 @@
 
   <div id="loadingIndicator" class="loading" style="display: none;">데이터 로딩 중</div>
   <div id="errorMessage" class="error" style="display: none;"></div>
+
+  <!-- JARVIS AI 분석 소견 -->
+  <div id="jarvisAnalysis" class="jarvis-analysis" style="display: none;">
+    <div class="jarvis-content" id="jarvisContent">
+      <!-- AI 분석 내용이 여기에 표시됩니다 -->
+    </div>
+  </div>
 
   <div class="stats-grid">
     <div class="stat-card">
@@ -447,7 +523,7 @@
 
         // 일별 데이터
         const requests = parseInt(stats.totalRequests || 0);
-        const errors = (stats.errorSamples || stats.errors || []).length;
+        const errors = parseInt(stats.totalErrors || (stats.errorSamples || stats.errors || []).length);
 
         dailyData.push({
           date: logDate,
@@ -503,7 +579,108 @@
       createTopUsersChart(users);
       createLocationsChart(locations);
 
+      // AI 분석 소견 생성
+      generateJarvisAnalysis({
+        dailyData,
+        totalRequests,
+        totalErrors,
+        hourlyUsage,
+        devices,
+        users,
+        locations,
+        documents
+      });
+
       console.log('[Dashboard] 시각화 완료');
+    }
+
+    function generateJarvisAnalysis(data) {
+      const { dailyData, totalRequests, totalErrors, hourlyUsage, devices, users, locations, documents } = data;
+      
+      // 추세 분석
+      const avgRequests = Math.round(totalRequests / documents.length);
+      const avgErrors = Math.round(totalErrors / documents.length);
+      const errorRate = ((totalErrors / totalRequests) * 100).toFixed(3);
+      
+      // 요청 수 추이
+      const requestTrend = dailyData.length >= 3 ? 
+        (dailyData[dailyData.length - 1].requests > dailyData[0].requests ? '증가' : '감소') : '분석 불가';
+      
+      // 에러 추이
+      const recentErrors = dailyData.slice(-7).reduce((sum, d) => sum + d.errors, 0);
+      const previousErrors = dailyData.slice(0, Math.min(7, dailyData.length)).reduce((sum, d) => sum + d.errors, 0);
+      const errorTrend = recentErrors > previousErrors ? '증가' : '감소';
+      
+      // 피크 시간대
+      const peakHours = Object.entries(hourlyUsage)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(h => `${h[0]}시`);
+      
+      // 가장 많이 사용된 기기
+      const topDevice = Object.entries(devices).sort((a, b) => b[1] - a[1])[0];
+      
+      // 에러가 가장 많았던 날
+      const maxErrorDay = dailyData.reduce((max, d) => d.errors > max.errors ? d : max, dailyData[0]);
+      
+      // 요청이 가장 많았던 날
+      const maxRequestDay = dailyData.reduce((max, d) => d.requests > max.requests ? d : max, dailyData[0]);
+      
+      // 주의사항 생성
+      const warnings = [];
+      if (errorRate > 0.1) warnings.push(`에러율이 <span class="critical">${errorRate}%</span>로 높습니다`);
+      if (errorTrend === '증가') warnings.push(`최근 7일간 에러 발생이 <span class="warning">증가</span> 추세입니다`);
+      if (recentErrors > avgErrors * 1.5) warnings.push(`최근 에러 발생이 평균 대비 <span class="warning">50% 이상 증가</span>했습니다`);
+      
+      // 권장사항 생성
+      const recommendations = [];
+      if (peakHours.length > 0) recommendations.push(`피크 시간대(${peakHours.join(', ')}) 서버 리소스 모니터링 강화`);
+      if (maxErrorDay) recommendations.push(`${maxErrorDay.dateFormatted} 에러 로그 상세 분석 필요`);
+      if (topDevice) recommendations.push(`${topDevice[0]} 기기 호환성 및 성능 최적화`);
+      
+      // HTML 생성
+      const jarvisHTML = `
+        <h4>📊 전반적인 상황</h4>
+        <ul>
+          <li>분석 기간: <span class="highlight">${documents.length}일</span> (${dailyData[0].dateFormatted} ~ ${dailyData[dailyData.length-1].dateFormatted})</li>
+          <li>총 요청 수: <span class="highlight">${totalRequests.toLocaleString()}건</span> (일평균 ${avgRequests.toLocaleString()}건)</li>
+          <li>총 에러 수: <span class="highlight">${totalErrors.toLocaleString()}건</span> (일평균 ${avgErrors.toLocaleString()}건)</li>
+          <li>에러율: <span class="${errorRate > 0.1 ? 'warning' : 'highlight'}">${errorRate}%</span></li>
+          <li>요청 추이: 기간 대비 <span class="highlight">${requestTrend}</span></li>
+        </ul>
+        
+        <h4>🔍 패턴 분석</h4>
+        <ul>
+          <li>피크 시간대: <span class="highlight">${peakHours.join(', ')}</span></li>
+          <li>최고 사용일: <span class="highlight">${maxRequestDay.dateFormatted}</span> (${maxRequestDay.requests.toLocaleString()}건)</li>
+          <li>최다 에러일: <span class="highlight">${maxErrorDay.dateFormatted}</span> (${maxErrorDay.errors.toLocaleString()}건)</li>
+          <li>주요 기기: <span class="highlight">${topDevice ? topDevice[0] : '데이터 없음'}</span></li>
+        </ul>
+        
+        ${warnings.length > 0 ? `
+        <h4>⚠️ 주의사항</h4>
+        <ul>
+          ${warnings.map(w => `<li>${w}</li>`).join('')}
+        </ul>
+        ` : ''}
+        
+        <h4>💡 권장사항</h4>
+        <ul>
+          ${recommendations.map(r => `<li>${r}</li>`).join('')}
+          <li>일별 에러 추이를 모니터링하여 이상 징후 조기 발견</li>
+          <li>시간대별 사용 패턴을 고려한 리소스 스케일링 전략 수립</li>
+        </ul>
+        
+        <h4>🔮 예측 및 대응</h4>
+        <ul>
+          <li>현재 추세가 유지될 경우 ${requestTrend === '증가' ? '서버 부하 증가 예상' : '안정적인 운영 가능'}</li>
+          <li>에러 ${errorTrend} 추세 - ${errorTrend === '증가' ? '<span class="warning">즉시 원인 분석 필요</span>' : '<span class="highlight">정상 범위 유지</span>'}</li>
+          <li>다음 피크 시간대(${peakHours[0]}) 전 시스템 상태 점검 권장</li>
+        </ul>
+      `;
+      
+      document.getElementById('jarvisContent').innerHTML = jarvisHTML;
+      document.getElementById('jarvisAnalysis').style.display = 'block';
     }
 
     function createDailyRequestsChart(dailyData) {

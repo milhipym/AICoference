@@ -2080,12 +2080,13 @@ ${logForAnalysis}
                 fileSizeMB: fileSizeMB.toFixed(2),
                 totalLines: 0,
                 totalRequests: 0,
+                totalErrors: 0, // 전체 에러 카운트
                 bizrequestServices: {},
                 hourlyUsage: {},
                 users: {},
                 devices: {},
                 locations: {},
-                errors: [],
+                errors: [], // 샘플 에러 (최대 100개)
                 dateRange: { start: null, end: null }
               };
               
@@ -2171,9 +2172,11 @@ ${logForAnalysis}
                   
                   // 에러 추출 (ERROR, Exception 포함)
                   if (line.match(/ERROR|Exception|exception|FAIL|fail/i)) {
-                    // 에러 메시지 추출 (너무 길면 자르기)
-                    const errorMsg = line.trim().substring(0, 200);
-                    if (stats.errors.length < 50) { // 최대 50개까지만 저장
+                    stats.totalErrors++; // 전체 에러 카운트
+                    
+                    // 에러 샘플 저장 (최대 100개)
+                    if (stats.errors.length < 100) {
+                      const errorMsg = line.trim().substring(0, 200);
                       stats.errors.push(errorMsg);
                     }
                   }
@@ -2225,6 +2228,7 @@ ${logForAnalysis}
                 fileSizeMB: stats.fileSizeMB,
                 totalLines: stats.totalLines,
                 totalRequests: stats.totalRequests,
+                totalErrors: stats.totalErrors, // 전체 에러 수
                 dateRange: stats.dateRange,
                 topServices: topN(stats.bizrequestServices, 10),
                 hourlyUsage: stats.hourlyUsage,
@@ -2278,7 +2282,8 @@ ${JSON.stringify(summaryStats, null, 2)}
     "location_insight": "지역별 사용 특징을 한국어로 설명"
   },
   "error_analysis": {
-    "error_count": "에러 샘플 수 (숫자)",
+    "total_error_count": ${stats.totalErrors},
+    "error_samples_count": "에러 샘플 수 (숫자)",
     "error_patterns": "주요 에러 패턴 및 유형을 한국어로 설명",
     "recommendations": "권장 조치사항을 한국어로 설명"
   },
