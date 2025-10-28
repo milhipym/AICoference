@@ -1303,11 +1303,19 @@
                   
                   const chunkText = await chunk.text();
                   
-                  // 청크별 통계 추출 프롬프트
+                  // 진행 상황 로그 추가
+                  const detailsDiv = document.getElementById('progressDetails');
+                  if (detailsDiv) {
+                    const time = new Date().toLocaleTimeString();
+                    detailsDiv.innerHTML += `[${time}] 청크 ${i+1}/${totalChunks} 읽기 완료 (${(chunkText.length / 1024).toFixed(1)} KB)<br>`;
+                    detailsDiv.scrollTop = detailsDiv.scrollHeight;
+                  }
+                  
+                  // 청크별 통계 추출 프롬프트 (전체 청크 데이터 사용)
                   const chunkPrompt = `다음 로그 데이터에서 통계를 추출하세요. 반드시 JSON 형식으로만 답변하세요.
 
 로그 데이터:
-${chunkText.substring(0, 50000)}
+${chunkText}
 
 추출할 통계 (JSON 형식):
 {
@@ -1335,6 +1343,13 @@ JSON만 답변하세요.`;
                   updateProgressPopup(i + 1, totalChunks, `청크 ${i+1} 분석 중...`);
                   
                   try {
+                    // 진행 로그
+                    if (detailsDiv) {
+                      const time = new Date().toLocaleTimeString();
+                      detailsDiv.innerHTML += `[${time}] 청크 ${i+1} AI 분석 요청 중...<br>`;
+                      detailsDiv.scrollTop = detailsDiv.scrollHeight;
+                    }
+                    
                     const chunkResponse = await call_llm_api(chunkPrompt, 'qwen');
                     
                     if (chunkResponse) {
@@ -1349,14 +1364,35 @@ JSON만 답변하세요.`;
                         }
                         chunkStats.push(chunkStat);
                         console.log(`[btn_learn_2] 청크 ${i+1} 분석 완료:`, chunkStat);
+                        
+                        // 성공 로그
+                        if (detailsDiv) {
+                          const time = new Date().toLocaleTimeString();
+                          detailsDiv.innerHTML += `[${time}] ✅ 청크 ${i+1} 분석 완료 (총 ${chunkStats.length}개 완료)<br>`;
+                          detailsDiv.scrollTop = detailsDiv.scrollHeight;
+                        }
                       } catch (parseError) {
                         console.error(`[btn_learn_2] 청크 ${i+1} JSON 파싱 실패:`, parseError);
-                        chunkStats.push({ chunk_number: i+1, error: 'JSON 파싱 실패', raw: chunkResponse });
+                        chunkStats.push({ chunk_number: i+1, error: 'JSON 파싱 실패', raw: chunkResponse.substring(0, 500) });
+                        
+                        // 파싱 실패 로그
+                        if (detailsDiv) {
+                          const time = new Date().toLocaleTimeString();
+                          detailsDiv.innerHTML += `[${time}] ⚠️ 청크 ${i+1} JSON 파싱 실패, 원본 저장<br>`;
+                          detailsDiv.scrollTop = detailsDiv.scrollHeight;
+                        }
                       }
                     }
                   } catch (error) {
                     console.error(`[btn_learn_2] 청크 ${i+1} 분석 실패:`, error);
                     chunkStats.push({ chunk_number: i+1, error: error.message });
+                    
+                    // 에러 로그
+                    if (detailsDiv) {
+                      const time = new Date().toLocaleTimeString();
+                      detailsDiv.innerHTML += `[${time}] ❌ 청크 ${i+1} 분석 실패: ${error.message}<br>`;
+                      detailsDiv.scrollTop = detailsDiv.scrollHeight;
+                    }
                   }
                   
                   updateProgressPopup(i + 1, totalChunks, `청크 ${i+1}/${totalChunks} 완료`);
@@ -1365,6 +1401,15 @@ JSON만 답변하세요.`;
                 // 최종 종합 분석
                 console.log('[btn_learn_2] 모든 청크 분석 완료, 최종 종합 시작');
                 updateProgressPopup(totalChunks, totalChunks, '최종 종합 분석 중...');
+                
+                // 최종 분석 시작 로그
+                const detailsDiv = document.getElementById('progressDetails');
+                if (detailsDiv) {
+                  const time = new Date().toLocaleTimeString();
+                  detailsDiv.innerHTML += `<br>[${time}] 📊 모든 청크 분석 완료! (${chunkStats.length}/${totalChunks})<br>`;
+                  detailsDiv.innerHTML += `[${time}] 🔄 최종 종합 분석 시작 (약 1~2분 소요)...<br>`;
+                  detailsDiv.scrollTop = detailsDiv.scrollHeight;
+                }
                 
                 const finalPrompt = `다음은 ${totalChunks}개 청크의 통계 데이터입니다. 이를 종합하여 최종 분석 리포트를 JSON 형식으로 작성하세요.
 
@@ -1401,13 +1446,24 @@ ${JSON.stringify(chunkStats, null, 2).substring(0, 100000)}
                 
                 const finalResponse = await call_llm_api(finalPrompt, 'qwen');
                 
-                progressPopup.remove();
-                
                 if (!finalResponse) {
+                  progressPopup.remove();
                   throw new Error('최종 종합 분석 실패');
                 }
                 
                 console.log('[btn_learn_2] 최종 LLM 응답:', finalResponse);
+                
+                // 최종 분석 완료 로그
+                if (detailsDiv) {
+                  const time = new Date().toLocaleTimeString();
+                  detailsDiv.innerHTML += `[${time}] ✅ 최종 종합 분석 완료!<br>`;
+                  detailsDiv.innerHTML += `[${time}] 📝 결과 파싱 중...<br>`;
+                  detailsDiv.scrollTop = detailsDiv.scrollHeight;
+                }
+                
+                // 잠시 대기 후 팝업 닫기
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                progressPopup.remove();
                 
                 // JSON 파싱
                 let jsonResult;
