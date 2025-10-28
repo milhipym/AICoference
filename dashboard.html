@@ -537,6 +537,7 @@
 
         // 시간대별 사용량 집계
         const hourly = stats.hourlyUsage || {};
+        console.log(`[Dashboard] ${logDateFormatted} hourlyUsage:`, hourly); // DEBUG
         Object.entries(hourly).forEach(([hour, count]) => {
           hourlyUsage[hour] = (hourlyUsage[hour] || 0) + count;
         });

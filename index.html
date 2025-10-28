@@ -1194,6 +1194,8 @@
           }
           
           // 인덱스에 삽입
+          // ⚠️ CRITICAL: local_statistics와 ai_analysis를 OpenSearch에 직접 저장해야
+          // dashboard.html에서 doc.local_statistics.hourlyUsage 등에 접근 가능
           const response = await fetch(`${OPENSEARCH_API_BASE}/index`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1203,7 +1205,14 @@
                 text: jsonText,
                 embedding: embedding,
                 file_name: fileName,
-                analysis_date: jsonResult.analysis_date || new Date().toISOString().split('T')[0]
+                analysis_date: jsonResult.analysis_date || new Date().toISOString().split('T')[0],
+                // 분석 데이터를 직접 저장 (dashboard에서 접근 가능하도록)
+                local_statistics: jsonResult.local_statistics,
+                ai_analysis: jsonResult.ai_analysis,
+                processing_info: jsonResult.processing_info,
+                // 날짜 필드 추가 (검색용)
+                log_date: jsonResult.local_statistics?.logDate || jsonResult.ai_analysis?.log_date,
+                log_date_formatted: jsonResult.local_statistics?.logDateFormatted || jsonResult.ai_analysis?.log_date_formatted
               }
             })
           });
