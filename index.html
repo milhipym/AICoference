@@ -856,7 +856,8 @@
     });
 
     // ==================== 학습 기능 API ====================
-    const OPENSEARCH_API_BASE = "http://10.10.22.81:8080";
+    // 프록시 서버를 통해 API 호출 (CORS 문제 해결)
+    const OPENSEARCH_API_BASE = "/api";  // 프록시 경로로 변경
     const DEFAULT_INDEX = "contest_pm_task";
 
     // 진행률 팝업 생성
