@@ -40,64 +40,104 @@ async function loadIntegratedDashboard() {
   console.log('[Dashboard Integration] 월간 대시보드 데이터 로드 시작');
   
   try {
-    // OpenSearch에서 데이터 가져오기
     const OPENSEARCH_API_BASE = "http://10.10.22.81:8080";
     const indexName = "contest_pm_task";
     
     // 날짜 추출 (파일명에서)
     const dateMatch = file.name.match(/(\d{8})/);
-    let searchDate = null;
+    let targetDate = null;
     if (dateMatch) {
       const dateStr = dateMatch[1];
       const year = dateStr.substring(0, 4);
       const month = dateStr.substring(4, 6);
       const day = dateStr.substring(6, 8);
-      searchDate = `${year}-${month}-${day}`;
+      targetDate = `${year}-${month}-${day}`;
     }
     
-    // OpenSearch 쿼리
-    const searchQuery = {
-      query: {
-        bool: {
-          must: searchDate ? [
-            {
-              match: {
-                "local_statistics.logDate": searchDate
+    if (!targetDate) {
+      console.warn('[Dashboard Integration] 파일명에서 날짜를 추출할 수 없습니다.');
+      document.getElementById('jarvisAnalysisIntegrated').style.display = 'none';
+      showDashboardError();
+      return;
+    }
+    
+    // 30일 범위 설정 (현재 날짜 기준 전후 15일)
+    const currentDate = new Date(targetDate);
+    const startDate = new Date(currentDate);
+    startDate.setDate(currentDate.getDate() - 15);
+    const endDate = new Date(currentDate);
+    endDate.setDate(currentDate.getDate() + 15);
+    
+    console.log('[Dashboard Integration] 날짜 범위:', formatDate(startDate), '~', formatDate(endDate));
+    
+    // 날짜별로 데이터 수집
+    const allDocuments = [];
+    
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const dateStr = formatDate(d);
+      
+      try {
+        // keyword_search API 사용 (dashboard.html과 동일)
+        const response = await fetch(`${OPENSEARCH_API_BASE}/keyword_search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: dateStr,
+            index: indexName,
+            k: 10
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.result && data.result.length > 0) {
+            // 결과 파싱 (문자열 → 객체)
+            const docs = data.result.map(item => {
+              if (typeof item === 'string') {
+                try {
+                  return JSON.parse(item);
+                } catch {
+                  return null;
+                }
               }
+              return item;
+            }).filter(doc => doc !== null);
+            
+            // 해당 날짜 문서만 필터링
+            const dateDocs = docs.filter(doc => {
+              const logDate = doc.local_statistics?.logDate || doc.log_date || '';
+              return logDate === dateStr;
+            });
+            
+            if (dateDocs.length > 0) {
+              allDocuments.push(dateDocs[0]); // 날짜당 1개 문서
+              console.log('[Dashboard Integration] 발견:', dateStr);
             }
-          ] : [{ match_all: {} }]
+          }
         }
-      },
-      size: 100
-    };
-    
-    const response = await fetch(`${OPENSEARCH_API_BASE}/search`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        index: indexName,
-        query: searchQuery
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error('OpenSearch 데이터 로드 실패');
+      } catch (err) {
+        console.warn('[Dashboard Integration] 날짜 검색 실패:', dateStr, err);
+      }
     }
     
-    const result = await response.json();
-    const documents = result.hits?.hits?.map(hit => hit._source) || [];
+    console.log('[Dashboard Integration] 총 데이터 수집 완료:', allDocuments.length, '일');
     
-    console.log('[Dashboard Integration] 데이터 로드 완료:', documents.length, '개 문서');
-    
-    if (documents.length === 0) {
+    if (allDocuments.length === 0) {
       console.warn('[Dashboard Integration] 데이터가 없습니다. 먼저 btn_learn_6으로 로그를 학습시켜주세요.');
       document.getElementById('jarvisAnalysisIntegrated').style.display = 'none';
       showDashboardError();
       return;
     }
     
+    // 날짜별로 정렬
+    allDocuments.sort((a, b) => {
+      const dateA = a.local_statistics?.logDate || a.log_date || '';
+      const dateB = b.local_statistics?.logDate || b.log_date || '';
+      return dateA.localeCompare(dateB);
+    });
+    
     // 데이터 처리
-    const dashboardData = processIntegratedDashboardData(documents);
+    const dashboardData = processIntegratedDashboardData(allDocuments);
     
     // JARVIS 분석 생성
     generateJarvisAnalysisIntegrated(dashboardData);
@@ -110,6 +150,14 @@ async function loadIntegratedDashboard() {
     document.getElementById('jarvisAnalysisIntegrated').style.display = 'none';
     showDashboardError();
   }
+}
+
+// 날짜 포맷 헬퍼 함수
+function formatDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // 차트 로드 실패 시 에러 메시지 표시
@@ -132,10 +180,12 @@ function showDashboardError() {
       margin: 20px 0;
     ">
       <div style="font-size: 48px; margin-bottom: 15px;">⚠️</div>
-      <div style="font-weight: bold; margin-bottom: 10px;">AI 통신 불가</div>
+      <div style="font-weight: bold; margin-bottom: 10px;">월간 데이터 없음</div>
       <div style="font-size: 14px; color: #ffaa00;">
-        OpenSearch 서버와 통신할 수 없거나 데이터가 없습니다.<br>
-        먼저 btn_learn_6으로 로그를 학습시켜주세요.
+        OpenSearch에서 월간 데이터를 찾을 수 없습니다.<br>
+        먼저 <strong>btn_learn_6</strong>으로 로그를 학습시켜주세요.<br><br>
+        💡 <strong>팁:</strong> 파일명을 "YYYYMMDD.log" 형식으로 업로드하세요<br>
+        (예: 20251030.log)
       </div>
     </div>
   `;
