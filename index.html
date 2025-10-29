@@ -7,29 +7,22 @@
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
 <title>프로미카 로그 모니터링</title>
-<link rel="stylesheet" href="css/common.css" />
-<link rel="stylesheet" href="css/contents.css" />
-<link rel="stylesheet" href="css/modal.css" />
-<link rel="stylesheet" href="css/card.css" />
-<link rel="stylesheet" href="css/layout-erroranalyze.css" />
-<link rel="stylesheet" href="css/layout-searchlist.css" />
-<link rel="stylesheet" href="css/layout-detailanalyze.css" />
+<link rel="stylesheet" href="css/common.css?v=20251029f" />
+<link rel="stylesheet" href="css/contents.css?v=20251029f" />
+<link rel="stylesheet" href="css/modal.css?v=20251029f" />
+<link rel="stylesheet" href="css/card.css?v=20251029f" />
+<link rel="stylesheet" href="css/layout-erroranalyze.css?v=20251029f" />
+<link rel="stylesheet" href="css/layout-searchlist.css?v=20251029f" />
+<link rel="stylesheet" href="css/layout-detailanalyze.css?v=20251029f" />
 </head>
 <body>
   <div class="cockpit">
-    <!-- 헤더 -->
-    <div class="cockpit-header">
-      <h1>◈ LOG MONITORING SYSTEM ◈</h1>
-      <p class="subtitle">REAL-TIME ANALYSIS DASHBOARD</p>
-      <div style="text-align: center; margin-top: 15px;">
-        <a href="dashboard.html" style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #00d9ff, #00ffff); color: #0a0e27; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 0 20px rgba(0, 255, 255, 0.4); transition: all 0.3s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 0 30px rgba(0, 255, 255, 0.6)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 0 20px rgba(0, 255, 255, 0.4)'">
-          📊 월간 분석 대시보드
-        </a>
-      </div>
+    <!-- 최상단 타이틀바 (최소 영역) -->
+    <div class="top-title-bar">
+      <h1>◈ AI LOG MONITORING ◈</h1>
     </div>
-
-    <!-- 메인 모니터 (대형 차트 화면) -->
-    <div class="main-monitor">
+    <!-- 메인 모니터 (차트 화면) -->
+    <div class="main-monitor main-monitor-compact">
       <div class="monitor-header">
         <span class="monitor-title">◆ TEMPORAL LOG DISTRIBUTION</span>
         <div class="monitor-indicators">
@@ -47,10 +40,10 @@
       </div>
     </div>
 
-    <!-- 하단 콘솔 패널 그리드 -->
-    <div class="console-grid">
+    <!-- 상단 콘솔 패널 그리드 (3개 컴팩트 패널) -->
+    <div class="console-grid-top" style="display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 16px !important; margin-bottom: 20px !important;">
       <!-- 파일 로드 패널 -->
-      <div class="console-panel">
+      <div class="console-panel console-panel-compact">
         <div class="panel-header">▣ FILE LOADER</div>
         <div class="panel-body">
           <div class="upload-zone" id="uploadZone">
@@ -77,7 +70,7 @@
       </div>
 
       <!-- 검색 제어 패널 -->
-      <div class="console-panel">
+      <div class="console-panel console-panel-compact">
         <div class="panel-header">▣ SEARCH CONTROL</div>
         <div class="panel-body">
           <div class="control-group">
@@ -97,15 +90,21 @@
       </div>
 
       <!-- 분석 옵션 패널 -->
-      <div class="console-panel">
+      <div class="console-panel console-panel-compact">
         <div class="panel-header">▣ ANALYSIS OPTIONS</div>
         <div class="panel-body">
           <button class="btn btn-cyber-neon" id="btnDetail" onclick="openDetailPopup()">종합 분석</button>
           <button class="btn btn-cyber-neon" id="btnErrorAnal" onclick="openErrorPopup()">오류 분석</button>
           <button class="btn btn-cyber-neon" id="btnSplit" onclick="doSplit()">FILE SPLIT</button>
+          <a href="dashboard.html" class="btn btn-dashboard" style="text-decoration: none; display: block; text-align: center;">
+            📊 월간 분석 대시보드
+          </a>
         </div>
       </div>
+    </div>
 
+    <!-- 하단 콘솔 패널 그리드 (로그 뷰어) -->
+    <div class="console-grid">
       <!-- 로그 뷰어 패널 -->
       <div class="console-panel log-viewer-half">
         <div class="panel-header">▣ LOG VIEWER</div>
@@ -113,8 +112,6 @@
           <div id="preview"></div>
         </div>
       </div>
-
-
     </div>
   </div>
 
@@ -168,7 +165,7 @@
       
       <div id="detailContent" style="display:none;">
         <div class="detail-section">
-          <h3>? Overall Statistics</h3>
+          <h3 id="overallStatsTitle">Overall Statistics</h3>
           <div class="detail-stats-grid">
             <div class="stat-card">
               <h4>Total Requests</h4>
@@ -186,17 +183,66 @@
         </div>
 
         <div class="detail-section">
-          <h3>? TOP 5 UX_ Requests</h3>
+          <h3 id="topRequestsTitle">TOP 5 UX_ Requests</h3>
           <div id="topRequests"></div>
         </div>
 
-        <div class="detail-section">
-          <h3>⚠️ Exceptions</h3>
-          <div id="errorLogs" class="error-list"></div>
-          <div id="errorPagination" class="error-pagination" style="display:none;">
-            <button class="btn-page" onclick="prevErrorPage()">◀ PREV</button>
-            <span class="page-info" id="errorPageInfo">1 / 1</span>
-            <button class="btn-page" onclick="nextErrorPage()">NEXT ▶</button>
+        <!-- 월간 분석 대시보드 통합 섹션 -->
+        <div class="detail-section dashboard-integrated">
+          <h3>📊 월간 추세 분석 (Monthly Trends)</h3>
+          
+          <!-- JARVIS AI 분석 -->
+          <div id="jarvisAnalysisIntegrated" class="jarvis-analysis-integrated" style="display:none;">
+            <div class="jarvis-header-integrated">
+              <span class="jarvis-icon">🤖</span>
+              <h4>J.A.R.V.I.S AI 분석 소견</h4>
+            </div>
+            <div id="jarvisContentIntegrated" class="jarvis-content-integrated"></div>
+          </div>
+
+          <!-- 차트 그리드 -->
+          <div class="dashboard-charts-grid">
+            <div class="chart-container-integrated">
+              <h4>📈 일별 요청 수</h4>
+              <div class="chart-wrapper-integrated">
+                <canvas id="dailyRequestsChartIntegrated"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-container-integrated">
+              <h4>❌ 일별 에러 수</h4>
+              <div class="chart-wrapper-integrated">
+                <canvas id="dailyErrorsChartIntegrated"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-container-integrated">
+              <h4>🕐 시간대별 사용량</h4>
+              <div class="chart-wrapper-integrated">
+                <canvas id="hourlyUsageChartIntegrated"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-container-integrated">
+              <h4>📱 주요 기기</h4>
+              <div class="chart-wrapper-integrated">
+                <canvas id="topDevicesChartIntegrated"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-container-integrated">
+              <h4>👥 주요 사용자</h4>
+              <div class="chart-wrapper-integrated">
+                <canvas id="topUsersChartIntegrated"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-container-integrated">
+              <h4>📍 지역 분포</h4>
+              <div class="chart-wrapper-integrated">
+                <canvas id="topLocationsChartIntegrated"></canvas>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -207,12 +253,14 @@
   <script src="js/jszip.min.js"></script>
   <script src="js/logWorkerSource.js"></script>
   <script src="js/plotly-3.1.0.min.js"></script>
+  <script src="js/chart.umd.min.js"></script>
   <script src="js/modal.js"></script>
   <script src="js/util/fileUtil.js"></script>
   <script src="js/util/stringUtil.js"></script>
   <script src="js/model/errorAnalyzeViewModel.js"></script>
   <script src="js/model/searchListViewModel.js"></script>
   <script src="js/model/detailInfoViewModel.js"></script>
+  <script src="js/dashboardIntegration.js"></script>
   <script src="js/main.js"></script>
   <script src="js/view/erroranalyze.js"></script>
   <script src="js/view/searchList.js"></script>
@@ -765,6 +813,11 @@
 
     // 분석 결과 표시
     function displayAnalysisResults() {
+      console.log('[displayAnalysisResults] 시작:', logAnalysisData);
+      
+      // 파일명을 타이틀에 표시
+      updateTitlesWithFileName();
+      
       document.getElementById('totalRequests').textContent = logAnalysisData.totalRequests.toLocaleString();
       document.getElementById('errorCount').textContent = logAnalysisData.totalErrorCount.toLocaleString();
       
@@ -788,8 +841,11 @@
       document.getElementById('topRequests').innerHTML = `
         <div class="detail-stats-grid">${topRequestsHTML || '<p style="color: #888;">UX_ 요청이 없습니다.</p>'}</div>
       `;
+      
+      console.log('[displayAnalysisResults] 데이터 표시 완료');
 
-      displayErrorPage();
+      // 월간 대시보드 통합 로드
+      loadIntegratedDashboard();
     }
 
     // 에러 페이지 표시

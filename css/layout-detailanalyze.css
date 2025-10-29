@@ -67,3 +67,132 @@
   box-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
   transform: scale(1.1);
 }
+
+/* ==================== 월간 대시보드 통합 스타일 ==================== */
+
+.dashboard-integrated {
+  margin-top: 40px;
+  padding-top: 30px;
+  border-top: 2px solid rgba(0, 255, 255, 0.3);
+}
+
+/* JARVIS AI 분석 통합 스타일 */
+.jarvis-analysis-integrated {
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.1), rgba(0, 217, 255, 0.05));
+  border: 2px solid rgba(0, 255, 255, 0.5);
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
+}
+
+.jarvis-header-integrated {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+}
+
+.jarvis-icon {
+  font-size: 28px;
+  animation: pulse-icon 2s ease-in-out infinite;
+}
+
+@keyframes pulse-icon {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.jarvis-header-integrated h4 {
+  color: #00ffff;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+  margin: 0;
+}
+
+.jarvis-content-integrated {
+  color: #e0e0e0;
+  line-height: 1.8;
+  font-size: 14px;
+}
+
+.jarvis-content-integrated h4 {
+  color: #00d9ff;
+  margin-top: 20px;
+  margin-bottom: 12px;
+  font-size: 16px;
+}
+
+.jarvis-content-integrated ul {
+  margin-left: 20px;
+  margin-bottom: 15px;
+}
+
+.jarvis-content-integrated li {
+  margin-bottom: 8px;
+}
+
+.jarvis-content-integrated .highlight {
+  color: #00ffff;
+  font-weight: bold;
+}
+
+.jarvis-content-integrated .warning {
+  color: #ffaa00;
+  font-weight: bold;
+}
+
+.jarvis-content-integrated .critical {
+  color: #ff6b6b;
+  font-weight: bold;
+}
+
+/* 차트 그리드 */
+.dashboard-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  gap: 25px;
+  margin-top: 20px;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-container-integrated {
+  background: rgba(0, 255, 255, 0.03);
+  border: 2px solid rgba(0, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 20px;
+  transition: all 0.3s ease;
+}
+
+.chart-container-integrated:hover {
+  border-color: rgba(0, 255, 255, 0.5);
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.2);
+  transform: translateY(-3px);
+}
+
+.chart-container-integrated h4 {
+  color: #00ffff;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.chart-wrapper-integrated {
+  position: relative;
+  height: 250px;
+}
+
+.chart-wrapper-integrated canvas {
+  max-height: 250px;
+}

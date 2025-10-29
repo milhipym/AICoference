@@ -1,27 +1,70 @@
-/* 조종실 레이아웃 */
+/* 최상단 타이틀바 (최소 영역) */
+.top-title-bar {
+    text-align: center;
+    padding: 12px 0;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border-primary);
+}
 
+.top-title-bar h1 {
+    color: var(--accent-cyan);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-shadow: 0 0 10px var(--glow-cyan);
+    margin: 0;
+}
+
+/* 조종실 레이아웃 */
 .cockpit {
     max-width: 1600px;
     margin: 0 auto;
+    padding: 10px 20px;
 }
 
-.cockpit-header {
-    text-align: center;
-    margin-bottom: 24px;
-    padding: 16px;
-    border-bottom: 2px solid var(--border-primary);
-    box-shadow: 0 4px 20px var(--glow-cyan);
+/* 상단 콘솔 패널 그리드 (3개 가로 배치) */
+.console-grid-top {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 16px !important;
+    margin-bottom: 20px !important;
 }
 
-.cockpit-header h1 {
-    margin-bottom: 8px;
+/* 24인치 모니터 최적화: 항상 가로 배치 유지 */
+@media (max-width: 900px) {
+    .console-grid-top {
+        grid-template-columns: 1fr !important;
+    }
 }
 
-.cockpit-header .subtitle {
-    color: var(--text-secondary);
-    font-size: 12px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
+/* 컴팩트 패널 스타일 */
+.console-panel-compact {
+    height: auto;
+    min-height: fit-content;
+    grid-column: span 1 !important; /* 기존 span 2 무시 */
+}
+
+.console-panel-compact .file-history {
+    margin-top: 12px;
+}
+
+.console-panel-compact .history-list {
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.console-panel-compact .history-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.console-panel-compact .history-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.console-panel-compact .history-list::-webkit-scrollbar-thumb {
+    background: var(--accent-cyan);
+    border-radius: 3px;
+    box-shadow: 0 0 8px var(--glow-cyan);
 }
 
 /* 메인 모니터 (대형) */
@@ -32,6 +75,17 @@
     margin-bottom: 24px;
     box-shadow: 0 0 40px var(--glow-cyan), inset 0 0 20px rgba(0, 217, 255, 0.05);
     overflow: hidden;
+}
+
+/* 컴팩트 모니터 (높이 조정) */
+.main-monitor-compact .monitor-body {
+    padding: 15px;
+    min-height: 400px;
+}
+
+.main-monitor-compact #chart {
+    min-height: 300px;
+    margin-bottom: 10px;
 }
 
 .monitor-header {
@@ -76,6 +130,7 @@
     position: relative;
 }
 
+/* 일반 모니터의 차트 높이 (기본값) */
 #chart {
     min-height: 420px;
     margin-bottom: 16px;
@@ -648,6 +703,30 @@ input[type="text"]::placeholder {
 .btn.cyberpunk2:hover {
     background: linear-gradient(135deg, #adff2f, #7fff00);
     box-shadow: 0 0 30px rgba(173, 255, 47, 0.7);
+}
+
+/* 월간 분석 대시보드 버튼 */
+.btn-dashboard {
+    width: 100%;
+    padding: 14px 20px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 2px solid #00d9ff;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 8px;
+    background: linear-gradient(135deg, #00d9ff, #00ffff);
+    color: #0a0e27;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+}
+
+.btn-dashboard:hover {
+    background: linear-gradient(135deg, #00ffff, #00d9ff);
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.6);
+    transform: translateY(-2px);
 }
 /*버튼 cyber-neon 버전 [ */
 .btn-cyber-neon {
