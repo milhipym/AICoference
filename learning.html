@@ -711,6 +711,30 @@
           "></div>
           
           <div style="display: flex; justify-content: center; gap: 20px; margin-top: 30px;">
+            <button id="pauseAnalysisBtn" style="
+              padding: 12px 30px;
+              background: linear-gradient(90deg, #ffcc00, #ff9900);
+              color: #000;
+              border: none;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: bold;
+              cursor: pointer;
+              box-shadow: 0 0 20px rgba(255, 153, 0, 0.5);
+              display: none;
+            ">⏸ 일시정지</button>
+            <button id="cancelAnalysisBtn" style="
+              padding: 12px 30px;
+              background: linear-gradient(90deg, #ff3333, #cc0000);
+              color: #fff;
+              border: none;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: bold;
+              cursor: pointer;
+              box-shadow: 0 0 20px rgba(255, 51, 51, 0.5);
+              display: none;
+            ">✕ 취소</button>
             <button id="closeProgressBtn" style="
               padding: 12px 30px;
               background: linear-gradient(90deg, #00ff00, #00cc00);
@@ -842,25 +866,37 @@
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
             console.log('[btn_learn_2] 총 청크 수:', totalChunks);
             
+            // 일시정지/취소 버튼 표시
+            const pauseBtn = document.getElementById('pauseAnalysisBtn');
+            const cancelBtn = document.getElementById('cancelAnalysisBtn');
+            if (pauseBtn) pauseBtn.style.display = 'block';
+            if (cancelBtn) cancelBtn.style.display = 'block';
+            
             let isPaused = false;
             let isCancelled = false;
             const chunkStats = [];
             
             // 일시정지 버튼
-            document.getElementById('pauseAnalysisBtn').addEventListener('click', () => {
-              isPaused = !isPaused;
-              const btn = document.getElementById('pauseAnalysisBtn');
-              btn.textContent = isPaused ? '▶ 재개' : '⏸ 일시정지';
-              console.log('[btn_learn_2] 분석', isPaused ? '일시정지' : '재개');
-            });
+            const pauseBtnElement = document.getElementById('pauseAnalysisBtn');
+            if (pauseBtnElement) {
+              pauseBtnElement.addEventListener('click', () => {
+                isPaused = !isPaused;
+                const btn = document.getElementById('pauseAnalysisBtn');
+                if (btn) btn.textContent = isPaused ? '▶ 재개' : '⏸ 일시정지';
+                console.log('[btn_learn_2] 분석', isPaused ? '일시정지' : '재개');
+              });
+            }
             
             // 취소 버튼
-            document.getElementById('cancelAnalysisBtn').addEventListener('click', () => {
-              if (confirm('정말 분석을 취소하시겠습니까?')) {
-                isCancelled = true;
-                console.log('[btn_learn_2] 분석 취소됨');
-              }
-            });
+            const cancelBtnElement = document.getElementById('cancelAnalysisBtn');
+            if (cancelBtnElement) {
+              cancelBtnElement.addEventListener('click', () => {
+                if (confirm('정말 분석을 취소하시겠습니까?')) {
+                  isCancelled = true;
+                  console.log('[btn_learn_2] 분석 취소됨');
+                }
+              });
+            }
             
             // 각 청크 분석
             for (let i = 0; i < totalChunks; i++) {
