@@ -705,29 +705,7 @@ input[type="text"]::placeholder {
     box-shadow: 0 0 30px rgba(173, 255, 47, 0.7);
 }
 
-/* 월간 분석 대시보드 버튼 */
-.btn-dashboard {
-    width: 100%;
-    padding: 14px 20px;
-    font-size: 13px;
-    font-weight: 700;
-    border: 2px solid #00d9ff;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-top: 8px;
-    background: linear-gradient(135deg, #00d9ff, #00ffff);
-    color: #0a0e27;
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
-}
 
-.btn-dashboard:hover {
-    background: linear-gradient(135deg, #00ffff, #00d9ff);
-    box-shadow: 0 0 30px rgba(0, 255, 255, 0.6);
-    transform: translateY(-2px);
-}
 /*버튼 cyber-neon 버전 [ */
 .btn-cyber-neon {
     background: transparent;
