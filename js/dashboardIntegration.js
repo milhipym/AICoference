@@ -114,6 +114,12 @@ async function loadIntegratedDashboard() {
 
 // 차트 로드 실패 시 에러 메시지 표시
 function showDashboardError() {
+  // 통계 카드 초기화
+  document.getElementById('totalDays').textContent = '-';
+  document.getElementById('totalRequestsSummary').textContent = '-';
+  document.getElementById('totalErrorsSummary').textContent = '-';
+  document.getElementById('avgRequestsPerDay').textContent = '-';
+  
   const errorMessage = `
     <div style="
       text-align: center;
@@ -236,6 +242,12 @@ function generateJarvisAnalysisIntegrated(data) {
   const avgErrors = Math.round(totalErrors / documents.length);
   const errorRate = ((totalErrors / totalRequests) * 100).toFixed(3);
   
+  // 통계 카드 업데이트
+  document.getElementById('totalDays').textContent = `${documents.length}일`;
+  document.getElementById('totalRequestsSummary').textContent = totalRequests.toLocaleString();
+  document.getElementById('totalErrorsSummary').textContent = totalErrors.toLocaleString();
+  document.getElementById('avgRequestsPerDay').textContent = avgRequests.toLocaleString();
+  
   // 피크 시간대
   const peakHours = Object.entries(hourlyUsage)
     .sort((a, b) => b[1] - a[1])
@@ -253,50 +265,96 @@ function generateJarvisAnalysisIntegrated(data) {
   const maxErrorDay = dailyData.reduce((max, day) => 
     day.errors > max.errors ? day : max, dailyData[0]);
   
-  // 경고 및 권장사항
-  const warnings = [];
-  const recommendations = [];
+  // 시스템 상태 판단
+  let systemStatus = '';
+  let statusColor = '';
   
-  if (parseFloat(errorRate) > 1.0) {
-    warnings.push(`에러율이 ${errorRate}%로 높습니다 - 즉시 점검 필요`);
+  if (parseFloat(errorRate) > 2.0 || avgErrors > 500) {
+    systemStatus = '위험';
+    statusColor = 'critical';
+  } else if (parseFloat(errorRate) > 1.0 || avgErrors > 100) {
+    systemStatus = '주의 필요';
+    statusColor = 'warning';
+  } else if (parseFloat(errorRate) > 0.5 || avgErrors > 50) {
+    systemStatus = '양호';
+    statusColor = 'good';
+  } else {
+    systemStatus = '매우 양호';
+    statusColor = 'good';
   }
-  if (avgErrors > 100) {
-    warnings.push(`일평균 에러 ${avgErrors}건 - 안정성 개선 필요`);
-  }
   
-  recommendations.push(`피크 시간대(${peakHours[0]}) 이전 시스템 리소스 확인`);
-  recommendations.push('주요 에러 패턴 분석 및 로그 필터링 강화');
-  
-  // HTML 생성
+  // JARVIS 대화형 분석 생성
   const jarvisHTML = `
-    <h4>📊 전체 개요</h4>
-    <ul>
-      <li>분석 기간: <span class="highlight">${documents.length}일</span></li>
-      <li>총 요청 수: <span class="highlight">${totalRequests.toLocaleString()}건</span></li>
-      <li>총 에러 수: <span class="${totalErrors > 1000 ? 'critical' : 'warning'}">${totalErrors.toLocaleString()}건</span></li>
-      <li>에러율: <span class="${parseFloat(errorRate) > 1 ? 'critical' : 'highlight'}">${errorRate}%</span></li>
-      <li>일평균 요청: <span class="highlight">${avgRequests.toLocaleString()}건</span></li>
-      <li>일평균 에러: <span class="highlight">${avgErrors.toLocaleString()}건</span></li>
-    </ul>
+    <p class="jarvis-greeting">안녕하세요, 주인님. J.A.R.V.I.S입니다.</p>
     
-    <h4>🔍 패턴 분석</h4>
-    <ul>
-      <li>피크 시간대: <span class="highlight">${peakHours.join(', ')}</span></li>
-      <li>최고 사용일: <span class="highlight">${maxRequestDay.dateFormatted}</span> (${maxRequestDay.requests.toLocaleString()}건)</li>
-      <li>최다 에러일: <span class="highlight">${maxErrorDay.dateFormatted}</span> (${maxErrorDay.errors.toLocaleString()}건)</li>
-      <li>주요 기기: <span class="highlight">${topDevice ? topDevice[0] : '데이터 없음'}</span></li>
-    </ul>
+    <div class="jarvis-section">
+      <span class="jarvis-label">🎯 전반적인 상황</span>
+      <p>
+        지난 <span class="highlight">${documents.length}일</span> 동안의 시스템 로그를 분석한 결과, 
+        총 <span class="highlight">${totalRequests.toLocaleString()}건</span>의 요청이 처리되었으며 
+        <span class="${statusColor}">${totalErrors.toLocaleString()}건</span>의 에러가 발생했습니다. 
+        현재 시스템 상태는 <span class="${statusColor}">"${systemStatus}"</span> 단계로 평가됩니다.
+      </p>
+      <p>
+        에러율은 <span class="${parseFloat(errorRate) > 1 ? 'critical' : 'highlight'}">${errorRate}%</span>이며, 
+        일평균 <span class="highlight">${avgRequests.toLocaleString()}건</span>의 요청과 
+        <span class="${avgErrors > 100 ? 'warning' : 'highlight'}">${avgErrors.toLocaleString()}건</span>의 에러가 발생하고 있습니다.
+      </p>
+    </div>
     
-    ${warnings.length > 0 ? `
-    <h4>⚠️ 주의사항</h4>
-    <ul>
-      ${warnings.map(w => `<li class="warning">${w}</li>`).join('')}
-    </ul>
+    <div class="jarvis-section">
+      <span class="jarvis-label">📊 패턴 분석</span>
+      <p>
+        시스템 사용 패턴을 분석한 결과, 가장 활발한 시간대는 
+        <span class="highlight">${peakHours.join(', ')}</span>입니다. 
+        특히 <span class="highlight">${maxRequestDay.dateFormatted}</span>에 
+        최대 <span class="highlight">${maxRequestDay.requests.toLocaleString()}건</span>의 요청이 집중되었습니다.
+      </p>
+      <p>
+        주요 접속 기기는 <span class="highlight">${topDevice ? topDevice[0] : '식별 불가'}</span>이며, 
+        <span class="warning">${maxErrorDay.dateFormatted}</span>에 
+        가장 많은 <span class="warning">${maxErrorDay.errors.toLocaleString()}건</span>의 에러가 기록되었습니다.
+      </p>
+    </div>
+    
+    ${parseFloat(errorRate) > 1.0 || avgErrors > 100 ? `
+    <div class="jarvis-section">
+      <span class="jarvis-label">⚠️ 주의사항</span>
+      <p>
+        ${parseFloat(errorRate) > 2.0 
+          ? `주인님, <span class="critical">심각한 문제</span>가 감지되었습니다. 에러율 ${errorRate}%는 즉각적인 조치가 필요한 수준입니다.` 
+          : parseFloat(errorRate) > 1.0 
+            ? `에러율 ${errorRate}%는 정상 범위를 벗어났습니다. 가까운 시일 내에 점검이 필요합니다.`
+            : ''}
+        ${avgErrors > 500 
+          ? ` 또한 일평균 <span class="critical">${avgErrors}건</span>의 에러는 시스템 안정성에 위협이 됩니다.`
+          : avgErrors > 100
+            ? ` 일평균 <span class="warning">${avgErrors}건</span>의 에러 발생은 개선이 필요한 수준입니다.`
+            : ''}
+      </p>
+    </div>
     ` : ''}
     
-    <h4>💡 권장사항</h4>
-    <ul>
-      ${recommendations.map(r => `<li>${r}</li>`).join('')}
+    <div class="jarvis-section">
+      <span class="jarvis-label">💡 권장사항</span>
+      <p>
+        ${parseFloat(errorRate) > 1.0 
+          ? '우선적으로 에러 로그를 상세히 분석하여 반복되는 패턴을 찾아내시기 바랍니다. '
+          : '현재 시스템은 안정적으로 운영되고 있으나, 지속적인 모니터링을 권장드립니다. '}
+        피크 시간대인 <span class="highlight">${peakHours[0]}</span> 이전에 시스템 리소스를 미리 확인하시고, 
+        필요시 스케일 아웃을 고려해주세요.
+      </p>
+      <p>
+        ${avgErrors > 100 
+          ? '에러 필터링 로직을 강화하고, 주요 에러 타입에 대한 예외 처리를 보완하시기 바랍니다. '
+          : '로그 수집 및 알림 체계를 유지하시고, '}
+        정기적인 성능 테스트를 통해 잠재적 병목 지점을 사전에 파악하시길 권장드립니다.
+      </p>
+    </div>
+    
+    <p style="margin-top: 20px; font-style: italic; color: #00d9ff;">
+      언제든 필요하시면 말씀해주세요, 주인님. 제가 도와드리겠습니다.
+    </p>
     </ul>
   `;
   

@@ -191,11 +191,36 @@
         <div class="detail-section dashboard-integrated">
           <h3>📊 월간 추세 분석 (Monthly Trends)</h3>
           
+          <!-- 핵심 통계 카드 -->
+          <div id="summaryStatsGrid" class="summary-stats-grid">
+            <div class="summary-stat-card">
+              <div class="summary-stat-icon">📅</div>
+              <div class="summary-stat-value" id="totalDays">-</div>
+              <div class="summary-stat-label">총 분석 일수</div>
+            </div>
+            <div class="summary-stat-card">
+              <div class="summary-stat-icon">📊</div>
+              <div class="summary-stat-value" id="totalRequestsSummary">-</div>
+              <div class="summary-stat-label">총 요청 수</div>
+            </div>
+            <div class="summary-stat-card">
+              <div class="summary-stat-icon">⚠️</div>
+              <div class="summary-stat-value" id="totalErrorsSummary" style="color: #ff6b6b;">-</div>
+              <div class="summary-stat-label">총 에러 수</div>
+            </div>
+            <div class="summary-stat-card">
+              <div class="summary-stat-icon">📈</div>
+              <div class="summary-stat-value" id="avgRequestsPerDay">-</div>
+              <div class="summary-stat-label">일평균 요청</div>
+            </div>
+          </div>
+          
           <!-- JARVIS AI 분석 -->
           <div id="jarvisAnalysisIntegrated" class="jarvis-analysis-integrated" style="display:none;">
             <div class="jarvis-header-integrated">
               <span class="jarvis-icon">🤖</span>
-              <h4>J.A.R.V.I.S AI 분석 소견</h4>
+              <h4>J.A.R.V.I.S</h4>
+              <span class="jarvis-subtitle">AI Assistant</span>
             </div>
             <div id="jarvisContentIntegrated" class="jarvis-content-integrated"></div>
           </div>
