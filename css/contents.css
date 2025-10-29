@@ -1,8 +1,8 @@
 /* 최상단 타이틀바 (최소 영역) */
 .top-title-bar {
     text-align: center;
-    padding: 12px 0;
-    margin-bottom: 16px;
+    padding: 8px 0;
+    margin-bottom: 12px;
     border-bottom: 1px solid var(--border-primary);
 }
 

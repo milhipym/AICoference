@@ -1652,33 +1652,81 @@ ${JSON.stringify(summaryStats, null, 2)}
           }
           
           console.log('[btn_learn_6] AI 요약 완료');
-          updateProgressPopup(100, 100, '분석 완료!');
+          updateProgressPopup(80, 100, 'AI 요약 완료! OpenSearch 저장 중...');
           
           if (detailsDiv) {
             const time = new Date().toLocaleTimeString();
             detailsDiv.innerHTML += `[${time}] ✅ AI 요약 생성 완료!<br>`;
+            detailsDiv.innerHTML += `[${time}] 💾 OpenSearch 저장 시작...<br>`;
             detailsDiv.scrollTop = detailsDiv.scrollHeight;
           }
           
-          // === 3단계: 결과 표시 ===
+          // JSON 파싱
+          let analysisResult;
+          try {
+            const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              analysisResult = JSON.parse(jsonMatch[0]);
+            } else {
+              analysisResult = JSON.parse(aiResponse);
+            }
+          } catch (parseError) {
+            console.error('[btn_learn_6] JSON 파싱 실패:', parseError);
+            analysisResult = { raw_response: aiResponse };
+          }
+          
+          // === 3단계: OpenSearch에 저장 ===
+          console.log('[btn_learn_6] 3단계: OpenSearch 저장 시작');
+          
+          const finalDocument = {
+            local_statistics: summaryStats,
+            ai_analysis: analysisResult,
+            processing_info: {
+              method: 'Local preprocessing + AI summary',
+              total_chunks_processed: totalChunks,
+              processing_time: '약 2~5분',
+              file_size_mb: fileSizeMB.toFixed(2)
+            },
+            timestamp: new Date().toISOString()
+          };
+          
+          try {
+            const response = await fetch(`${OPENSEARCH_API_BASE}/index`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                index: DEFAULT_INDEX,
+                document: finalDocument
+              })
+            });
+            
+            const result = await response.json();
+            console.log('[btn_learn_6] OpenSearch 저장 결과:', result);
+            
+            updateProgressPopup(100, 100, '✓ 분석 및 저장 완료!');
+            
+            if (detailsDiv) {
+              const time = new Date().toLocaleTimeString();
+              detailsDiv.innerHTML += `[${time}] ✅ OpenSearch 저장 완료!<br>`;
+              detailsDiv.innerHTML += `[${time}] 📁 Index: ${DEFAULT_INDEX}<br>`;
+              detailsDiv.scrollTop = detailsDiv.scrollHeight;
+            }
+          } catch (saveError) {
+            console.error('[btn_learn_6] OpenSearch 저장 실패:', saveError);
+            updateProgressPopup(100, 100, '⚠ 분석 완료 (저장 실패)');
+            
+            if (detailsDiv) {
+              const time = new Date().toLocaleTimeString();
+              detailsDiv.innerHTML += `[${time}] ⚠️ OpenSearch 저장 실패: ${saveError.message}<br>`;
+              detailsDiv.scrollTop = detailsDiv.scrollHeight;
+            }
+          }
+          
+          // === 4단계: 결과 표시 ===
           setTimeout(() => {
             progressPopup.remove();
             
-            // JSON 파싱
-            let analysisResult;
-            try {
-              const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                analysisResult = JSON.parse(jsonMatch[0]);
-              } else {
-                analysisResult = JSON.parse(aiResponse);
-              }
-            } catch (parseError) {
-              console.error('[btn_learn_6] JSON 파싱 실패:', parseError);
-              analysisResult = { raw_response: aiResponse };
-            }
-            
-            // 결과 팝업 생성 (btn_learn_2와 동일한 형식)
+            // 결과 팝업 생성
             const combinedResult = {
               local_statistics: summaryStats,
               ai_analysis: analysisResult,
