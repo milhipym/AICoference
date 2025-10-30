@@ -82,6 +82,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
       mainModel.timeRangeSize = 24;
 
+      // sessionStorage에 파일 정보 저장 (페이지 이동 시 유지)
+      try {
+        const fileId = `${f.name}_${f.size}`;
+        sessionStorage.setItem('currentLogFileId', fileId);
+        sessionStorage.setItem('currentLogFileName', f.name);
+        console.log('[파일 저장] sessionStorage에 저장:', fileId);
+      } catch (e) {
+        console.warn('[파일 저장] sessionStorage 저장 실패:', e);
+      }
+
       // 검색 버튼 깜빡임 추가
       var searchBtn = document.getElementById('btnSearch');
       if (searchBtn) {
@@ -104,6 +114,42 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // 로그 뷰어 초기화
   addLogLine("SYSTEM INITIALIZED");
+
+  // sessionStorage에서 파일 복원 (페이지 이동 후 돌아왔을 때)
+  setTimeout(async () => {
+    try {
+      const savedFileId = sessionStorage.getItem('currentLogFileId');
+      const savedFileName = sessionStorage.getItem('currentLogFileName');
+      
+      if (savedFileId && savedFileName && !mainModel.logfile) {
+        console.log('[파일 복원] sessionStorage에서 파일 복원 시도:', savedFileId);
+        
+        // IndexedDB에서 파일 불러오기
+        if (typeof loadFileFromIndexedDB === 'function') {
+          const file = await loadFileFromIndexedDB(savedFileId);
+          
+          if (file) {
+            mainModel.logfile = file;
+            fileName.textContent = file.name;
+            console.log('[파일 복원] 파일 복원 완료:', file.name);
+            addLogLine(`FILE RESTORED: ${file.name}`);
+            
+            // 검색 버튼 깜빡임 추가
+            var searchBtn = document.getElementById('btnSearch');
+            if (searchBtn) {
+              searchBtn.classList.add('btn-blink');
+            }
+          } else {
+            console.warn('[파일 복원] IndexedDB에 파일이 없음:', savedFileId);
+            sessionStorage.removeItem('currentLogFileId');
+            sessionStorage.removeItem('currentLogFileName');
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[파일 복원] 파일 복원 실패:', e);
+    }
+  }, 500);
 });
 
 // 해커 스타일 로그 라인 관리
