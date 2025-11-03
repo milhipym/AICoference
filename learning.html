@@ -596,9 +596,18 @@
     // LLM API 호출 함수
     async function call_llm_api(prompt, model, silentMode = false, customLimit = null) {
       const limit = customLimit !== null ? customLimit : 4096;
-      console.log('[call_llm_api] LLM 호출 시작, model:', model, 'silentMode:', silentMode, 'limit:', limit);
+      const promptSizeMB = (prompt.length / (1024 * 1024)).toFixed(2);
+      console.log('[call_llm_api] LLM 호출 시작');
+      console.log('[call_llm_api] - model:', model);
+      console.log('[call_llm_api] - prompt size:', promptSizeMB, 'MB');
+      console.log('[call_llm_api] - limit:', limit);
+      console.log('[call_llm_api] - silentMode:', silentMode);
       
       try {
+        // 타임아웃 설정 (5분)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+        
         const response = await fetch(`${OPENSEARCH_API_BASE}/vllm_chat`, {
           method: 'POST',
           headers: { 
@@ -608,22 +617,37 @@
             text: prompt, 
             model: model,
             limit: limit
-          })
+          }),
+          signal: controller.signal
         });
         
+        clearTimeout(timeoutId);
+        
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          const errorText = await response.text().catch(() => 'Unknown error');
+          console.error('[call_llm_api] HTTP 에러:', response.status, errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 200)}`);
         }
         
         const data = await response.json();
         console.log('[call_llm_api] LLM 응답 받음, 길이:', data.content?.length);
         return data.content;
       } catch (error) {
-        console.error('[call_llm_api] LLM 호출 실패:', error);
-        
-        // silentMode가 false일 때만 alert 표시
-        if (!silentMode) {
-          alert('AI 분석 중 오류 발생: ' + error.message);
+        if (error.name === 'AbortError') {
+          console.error('[call_llm_api] 타임아웃 (5분 초과)');
+          if (!silentMode) {
+            alert('AI 분석 타임아웃 (5분 초과)');
+          }
+        } else {
+          console.error('[call_llm_api] LLM 호출 실패:', error);
+          console.error('[call_llm_api] - 에러 타입:', error.name);
+          console.error('[call_llm_api] - 에러 메시지:', error.message);
+          console.error('[call_llm_api] - 프롬프트 크기:', promptSizeMB, 'MB');
+          
+          // silentMode가 false일 때만 alert 표시
+          if (!silentMode) {
+            alert('AI 분석 중 오류 발생: ' + error.message);
+          }
         }
         return null;
       }
@@ -841,11 +865,11 @@
         const fileSizeMB = file.size / (1024 * 1024);
         let useChunkAnalysis = false;
         
-        if (fileSizeMB > 9) {
+        if (fileSizeMB > 5) {
           const choice = confirm(
             `파일 크기: ${fileSizeMB.toFixed(2)} MB\n\n` +
             `전체 파일 분석 모드를 사용하시겠습니까?\n\n` +
-            `[확인] 전체 분석 (${Math.ceil(fileSizeMB / 9)}개 청크, 약 ${Math.ceil(fileSizeMB / 9 * 0.3)}분 소요)\n` +
+            `[확인] 전체 분석 (${Math.ceil(fileSizeMB / 5)}개 청크, 약 ${Math.ceil(fileSizeMB / 5 * 0.5)}분 소요)\n` +
             `[취소] 샘플링 분석 (빠름, 약 1분 소요)`
           );
           useChunkAnalysis = choice;
@@ -862,9 +886,10 @@
             const progressPopup = createProgressPopup(file.name, fileSizeMB);
             document.body.appendChild(progressPopup);
             
-            const CHUNK_SIZE = 9 * 1024 * 1024; // 9MB (API 제한 10MB 미만)
+            const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB (vLLM 안정성 확보)
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
             console.log('[btn_learn_2] 총 청크 수:', totalChunks);
+            console.log('[btn_learn_2] 청크 크기:', (CHUNK_SIZE / (1024 * 1024)).toFixed(1), 'MB');
             
             // 일시정지/취소 버튼 표시
             const pauseBtn = document.getElementById('pauseAnalysisBtn');
@@ -932,9 +957,13 @@
               }
               
               // 청크별 통계 추출 프롬프트 (API 제한을 고려한 크기)
-              // 프롬프트 자체 + 로그 데이터가 9MB 이하여야 함
-              const maxLogSize = 8 * 1024 * 1024; // 8MB (프롬프트 텍스트 여유 공간 확보)
+              // vLLM API는 실제로 5-6MB 정도가 안정적
+              const maxLogSize = 5 * 1024 * 1024; // 5MB로 감소 (안정성 확보)
               const safeChunkText = chunkText.length > maxLogSize ? chunkText.substring(0, maxLogSize) : chunkText;
+              
+              // 프롬프트 크기 체크
+              const promptSize = (safeChunkText.length + 500) / (1024 * 1024); // MB 단위
+              console.log(`[btn_learn_2] 청크 ${i+1} 프롬프트 크기: ${promptSize.toFixed(2)} MB`);
               
               const chunkPrompt = `다음 로그 데이터에서 통계를 추출하세요. 반드시 JSON 형식으로만 답변하세요.
 
@@ -964,13 +993,13 @@ ${safeChunkText}
 
 JSON만 답변하세요.`;
               
-              updateProgressPopup(i + 1, totalChunks, `청크 ${i+1} 분석 중...`);
+              updateProgressPopup(i + 1, totalChunks, `청크 ${i+1} 분석 중... (${promptSize.toFixed(1)}MB)`);
               
               try {
                 // 진행 로그
                 if (detailsDiv) {
                   const time = new Date().toLocaleTimeString();
-                  detailsDiv.innerHTML += `[${time}] 청크 ${i+1} AI 분석 요청 중...<br>`;
+                  detailsDiv.innerHTML += `[${time}] 청크 ${i+1} AI 분석 요청 중... (${promptSize.toFixed(2)}MB)<br>`;
                   detailsDiv.scrollTop = detailsDiv.scrollHeight;
                 }
                 
