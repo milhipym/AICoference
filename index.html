@@ -290,49 +290,56 @@
   <script src="js/view/detailInfo.js"></script>
   
   <script>
-    const uploadZone = document.getElementById('uploadZone');
-    const fileInputEl = document.getElementById('file');
+    // DOM 로드 후 실행
+    document.addEventListener('DOMContentLoaded', function() {
+      const uploadZone = document.getElementById('uploadZone');
+      const fileInputEl = document.getElementById('file');
 
-    uploadZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      uploadZone.classList.add('dragover');
-    });
+      if (uploadZone) {
+        uploadZone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          uploadZone.classList.add('dragover');
+        });
 
-    uploadZone.addEventListener('dragleave', () => {
-      uploadZone.classList.remove('dragover');
-    });
+        uploadZone.addEventListener('dragleave', () => {
+          uploadZone.classList.remove('dragover');
+        });
 
-    uploadZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      uploadZone.classList.remove('dragover');
-      
-      const files = e.dataTransfer.files;
-      if (files.length > 0) {
-        const f = files[0];
-        window.logfile = f;
-        document.getElementById('file-name').textContent = f.name;
-        
-        if (typeof chartDragClear === 'function') {
-          chartDragClear();
-        }
-        window.timeRangeSize = 24;
-        
-        // 히스토리에 추가
-        if (typeof addToHistory === 'function') {
-          addToHistory(f);
-        }
+        uploadZone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          uploadZone.classList.remove('dragover');
+          
+          const files = e.dataTransfer.files;
+          if (files.length > 0) {
+            const f = files[0];
+            window.logfile = f;
+            document.getElementById('file-name').textContent = f.name;
+            
+            if (typeof chartDragClear === 'function') {
+              chartDragClear();
+            }
+            window.timeRangeSize = 24;
+            
+            // 히스토리에 추가
+            if (typeof addToHistory === 'function') {
+              addToHistory(f);
+            }
+          }
+        });
       }
-    });
 
-    fileInputEl.addEventListener('change', (e) => {
-      const f = e.target.files && e.target.files[0];
-      if (f) {
-        document.getElementById('file-name').textContent = f.name;
-        
-        // 히스토리에 추가
-        if (typeof addToHistory === 'function') {
-          addToHistory(f);
-        }
+      if (fileInputEl) {
+        fileInputEl.addEventListener('change', (e) => {
+          const f = e.target.files && e.target.files[0];
+          if (f) {
+            document.getElementById('file-name').textContent = f.name;
+            
+            // 히스토리에 추가
+            if (typeof addToHistory === 'function') {
+              addToHistory(f);
+            }
+          }
+        });
       }
     });
 
@@ -2432,9 +2439,9 @@ ${JSON.stringify(summaryStats, null, 2)}
               // === 3단계: OpenSearch에 저장 ===
               console.log('[btn_learn_6] 3단계: OpenSearch 저장 시작');
               
-              // 날짜 정보 확인
-              const logDate = stats.logDate;
-              const logDateFormatted = stats.logDateFormatted;
+              // 날짜 정보 확인 (이미 선언된 변수 사용)
+              // const logDate = stats.logDate; // 중복 선언 제거
+              // const logDateFormatted = stats.logDateFormatted; // 중복 선언 제거
               
               if (!logDate) {
                 console.warn('[btn_learn_6] 날짜 정보 없음, 차트에 표시되지 않을 수 있음');
