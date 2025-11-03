@@ -347,7 +347,6 @@
 <body>
   <div class="container">
     <div class="header">
-      <a href="index.html" class="back-button">← 돌아가기</a>
       <h1>◈ LOG LEARNING SYSTEM ◈</h1>
       <p>OpenSearch AI 학습 관리 시스템</p>
     </div>
@@ -596,10 +595,10 @@
     // LLM API 호출 함수
     async function call_llm_api(prompt, model, silentMode = false, customLimit = null) {
       const limit = customLimit !== null ? customLimit : 4096;
-      const promptSizeMB = (prompt.length / (1024 * 1024)).toFixed(2);
+      const promptSizeKB = (prompt.length / 1024).toFixed(1);
       console.log('[call_llm_api] LLM 호출 시작');
       console.log('[call_llm_api] - model:', model);
-      console.log('[call_llm_api] - prompt size:', promptSizeMB, 'MB');
+      console.log('[call_llm_api] - prompt size:', promptSizeKB, 'KB');
       console.log('[call_llm_api] - limit:', limit);
       console.log('[call_llm_api] - silentMode:', silentMode);
       
@@ -642,7 +641,7 @@
           console.error('[call_llm_api] LLM 호출 실패:', error);
           console.error('[call_llm_api] - 에러 타입:', error.name);
           console.error('[call_llm_api] - 에러 메시지:', error.message);
-          console.error('[call_llm_api] - 프롬프트 크기:', promptSizeMB, 'MB');
+          console.error('[call_llm_api] - 프롬프트 크기:', promptSizeKB, 'KB');
           
           // silentMode가 false일 때만 alert 표시
           if (!silentMode) {
@@ -865,11 +864,14 @@
         const fileSizeMB = file.size / (1024 * 1024);
         let useChunkAnalysis = false;
         
-        if (fileSizeMB > 5) {
+        const chunkSizeKB = 50; // 50KB (CORS 오류 방지)
+        const estimatedChunks = Math.ceil(fileSizeMB * 1024 / chunkSizeKB);
+        
+        if (fileSizeMB > 0.05) { // 50KB 이상
           const choice = confirm(
             `파일 크기: ${fileSizeMB.toFixed(2)} MB\n\n` +
             `전체 파일 분석 모드를 사용하시겠습니까?\n\n` +
-            `[확인] 전체 분석 (${Math.ceil(fileSizeMB / 5)}개 청크, 약 ${Math.ceil(fileSizeMB / 5 * 0.5)}분 소요)\n` +
+            `[확인] 전체 분석 (약 ${estimatedChunks}개 청크, 약 ${Math.ceil(estimatedChunks * 0.1)}분 소요)\n` +
             `[취소] 샘플링 분석 (빠름, 약 1분 소요)`
           );
           useChunkAnalysis = choice;
@@ -886,10 +888,10 @@
             const progressPopup = createProgressPopup(file.name, fileSizeMB);
             document.body.appendChild(progressPopup);
             
-            const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB (vLLM 안정성 확보)
+            const CHUNK_SIZE = 50 * 1024; // 50KB (CORS 오류 방지)
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
             console.log('[btn_learn_2] 총 청크 수:', totalChunks);
-            console.log('[btn_learn_2] 청크 크기:', (CHUNK_SIZE / (1024 * 1024)).toFixed(1), 'MB');
+            console.log('[btn_learn_2] 청크 크기:', (CHUNK_SIZE / 1024).toFixed(1), 'KB');
             
             // 일시정지/취소 버튼 표시
             const pauseBtn = document.getElementById('pauseAnalysisBtn');
@@ -956,14 +958,14 @@
                 detailsDiv.scrollTop = detailsDiv.scrollHeight;
               }
               
-              // 청크별 통계 추출 프롬프트 (API 제한을 고려한 크기)
-              // vLLM API는 실제로 5-6MB 정도가 안정적
-              const maxLogSize = 5 * 1024 * 1024; // 5MB로 감소 (안정성 확보)
+              // 청크별 통계 추출 프롬프트 (CORS 오류 방지)
+              // 50KB 청크 사용 (CORS 제한)
+              const maxLogSize = 40 * 1024; // 40KB (프롬프트 텍스트 포함 50KB 미만)
               const safeChunkText = chunkText.length > maxLogSize ? chunkText.substring(0, maxLogSize) : chunkText;
               
               // 프롬프트 크기 체크
-              const promptSize = (safeChunkText.length + 500) / (1024 * 1024); // MB 단위
-              console.log(`[btn_learn_2] 청크 ${i+1} 프롬프트 크기: ${promptSize.toFixed(2)} MB`);
+              const promptSize = (safeChunkText.length + 500) / 1024; // KB 단위
+              console.log(`[btn_learn_2] 청크 ${i+1} 프롬프트 크기: ${promptSize.toFixed(1)} KB`);
               
               const chunkPrompt = `다음 로그 데이터에서 통계를 추출하세요. 반드시 JSON 형식으로만 답변하세요.
 
@@ -993,13 +995,13 @@ ${safeChunkText}
 
 JSON만 답변하세요.`;
               
-              updateProgressPopup(i + 1, totalChunks, `청크 ${i+1} 분석 중... (${promptSize.toFixed(1)}MB)`);
+              updateProgressPopup(i + 1, totalChunks, `청크 ${i+1} 분석 중... (${promptSize.toFixed(1)}KB)`);
               
               try {
                 // 진행 로그
                 if (detailsDiv) {
                   const time = new Date().toLocaleTimeString();
-                  detailsDiv.innerHTML += `[${time}] 청크 ${i+1} AI 분석 요청 중... (${promptSize.toFixed(2)}MB)<br>`;
+                  detailsDiv.innerHTML += `[${time}] 청크 ${i+1} AI 분석 요청 중... (${promptSize.toFixed(1)}KB)<br>`;
                   detailsDiv.scrollTop = detailsDiv.scrollHeight;
                 }
                 
