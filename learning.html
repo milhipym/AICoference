@@ -1830,117 +1830,160 @@ ${JSON.stringify(summaryStats, null, 2)}
           
           // 청크 단위로 파일 읽기 (메모리 효율을 위해 10MB 단위)
           const CHUNK_READ_SIZE = 10 * 1024 * 1024; // 10MB
-          const totalChunks = Math.ceil(file.size / CHUNK_READ_SIZE);
-          console.log('[btn_learn_3] 총 읽기 청크 수:', totalChunks);
+          const EMBEDDING_CHUNK_SIZE = 1000; // 임베딩용 청크 크기
+          const totalReadChunks = Math.ceil(file.size / CHUNK_READ_SIZE);
+          
+          console.log('[btn_learn_3] 총 읽기 청크 수:', totalReadChunks);
+          console.log('[btn_learn_3] 파일 크기:', fileSizeMB.toFixed(2), 'MB');
           
           let successCount = 0;
           let failCount = 0;
-          let allText = '';
+          let totalEmbeddingChunks = 0;
+          let leftoverText = ''; // 이전 청크에서 남은 텍스트 (1000자 미만)
           
-          // 파일을 청크 단위로 읽기
-          for (let i = 0; i < totalChunks; i++) {
-            const start = i * CHUNK_READ_SIZE;
+          const detailsDiv = document.getElementById('progressDetails');
+          
+          // 파일을 청크 단위로 읽고 바로 처리 (메모리에 전체 텍스트 저장 X)
+          for (let readChunkIdx = 0; readChunkIdx < totalReadChunks; readChunkIdx++) {
+            const start = readChunkIdx * CHUNK_READ_SIZE;
             const end = Math.min(start + CHUNK_READ_SIZE, file.size);
             const chunk = file.slice(start, end);
             
-            console.log(`[btn_learn_3] 청크 ${i+1}/${totalChunks} 읽기 중... (${start}-${end})`);
-            updateProgressPopup(i + 1, totalChunks * 2, `파일 읽기 중... (${i+1}/${totalChunks})`);
+            console.log(`[btn_learn_3] 읽기 청크 ${readChunkIdx+1}/${totalReadChunks} (${start}-${end})`);
+            updateProgressPopup(readChunkIdx + 1, totalReadChunks, 
+              `파일 읽기 ${readChunkIdx+1}/${totalReadChunks} (임베딩 ${totalEmbeddingChunks}개 처리됨)`);
             
             const chunkText = await chunk.text();
-            allText += chunkText;
-          }
-          
-          console.log('[btn_learn_3] 전체 파일 읽기 완료, 크기:', allText.length, 'bytes');
-          
-          // 임베딩을 위해 텍스트를 1000자 단위로 분할
-          const EMBEDDING_CHUNK_SIZE = 1000;
-          const textChunks = [];
-          
-          for (let i = 0; i < allText.length; i += EMBEDDING_CHUNK_SIZE) {
-            textChunks.push(allText.substring(i, i + EMBEDDING_CHUNK_SIZE));
-          }
-          
-          console.log('[btn_learn_3] 총 임베딩 청크 수:', textChunks.length);
-          
-          const detailsDiv = document.getElementById('progressDetails');
-          if (detailsDiv) {
-            const time = new Date().toLocaleTimeString();
-            detailsDiv.innerHTML += `[${time}] 📊 총 ${textChunks.length}개 청크로 분할 완료<br>`;
-            detailsDiv.scrollTop = detailsDiv.scrollHeight;
-          }
-          
-          // 각 청크를 임베딩하여 인덱스에 삽입
-          for (let i = 0; i < textChunks.length; i++) {
-            const chunk = textChunks[i];
             
-            if (i % 10 === 0) {
-              console.log(`[btn_learn_3] 청크 ${i+1}/${textChunks.length} 처리 중...`);
-            }
+            // 이전에 남은 텍스트와 합치기
+            let fullText = leftoverText + chunkText;
             
-            updateProgressPopup(totalChunks + i + 1, totalChunks + textChunks.length, 
-              `임베딩 처리 중... (${i+1}/${textChunks.length})`);
-            
-            // 임베딩 생성
-            const embedding = await embed_query(chunk);
-            
-            if (!embedding) {
-              console.error(`[btn_learn_3] 청크 ${i+1} 임베딩 실패`);
-              failCount++;
+            // 1000자 단위로 분할하여 바로 임베딩 처리
+            let textIdx = 0;
+            while (textIdx + EMBEDDING_CHUNK_SIZE <= fullText.length) {
+              const embChunk = fullText.substring(textIdx, textIdx + EMBEDDING_CHUNK_SIZE);
+              textIdx += EMBEDDING_CHUNK_SIZE;
               
-              if (detailsDiv && i % 50 === 0) {
-                const time = new Date().toLocaleTimeString();
-                detailsDiv.innerHTML += `[${time}] ⚠️ 청크 ${i+1} 임베딩 실패<br>`;
-                detailsDiv.scrollTop = detailsDiv.scrollHeight;
+              totalEmbeddingChunks++;
+              
+              if (totalEmbeddingChunks % 10 === 0) {
+                console.log(`[btn_learn_3] 임베딩 청크 ${totalEmbeddingChunks} 처리 중...`);
+                updateProgressPopup(readChunkIdx + 1, totalReadChunks, 
+                  `임베딩 ${totalEmbeddingChunks}개 처리 중...`);
               }
-              continue;
-            }
-            
-            // 데이터 삽입
-            try {
-              const response = await fetch(`${OPENSEARCH_API_BASE}/index`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  index: indexName,
-                  document: {
-                    text: chunk,
-                    embedding: embedding,
-                    chunk_index: i,
-                    file_name: file.name,
-                    timestamp: new Date().toISOString()
-                  }
-                })
-              });
               
-              const result = await response.json();
+              // 임베딩 생성
+              const embedding = await embed_query(embChunk);
               
-              if (result.result === 'created') {
-                successCount++;
-              } else {
+              if (!embedding) {
+                console.error(`[btn_learn_3] 임베딩 청크 ${totalEmbeddingChunks} 임베딩 실패`);
+                failCount++;
+                
+                if (detailsDiv && totalEmbeddingChunks % 100 === 0) {
+                  const time = new Date().toLocaleTimeString();
+                  detailsDiv.innerHTML += `[${time}] ⚠️ 청크 ${totalEmbeddingChunks} 임베딩 실패<br>`;
+                  detailsDiv.scrollTop = detailsDiv.scrollHeight;
+                }
+                continue;
+              }
+              
+              // 데이터 삽입
+              try {
+                const response = await fetch(`${OPENSEARCH_API_BASE}/index`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    index: indexName,
+                    document: {
+                      text: embChunk,
+                      embedding: embedding,
+                      chunk_index: totalEmbeddingChunks - 1,
+                      file_name: file.name,
+                      timestamp: new Date().toISOString()
+                    }
+                  })
+                });
+                
+                const result = await response.json();
+                
+                if (result.result === 'created') {
+                  successCount++;
+                } else {
+                  failCount++;
+                }
+                
+                // 진행 상황 로그 (100개마다)
+                if (detailsDiv && totalEmbeddingChunks % 100 === 0) {
+                  const time = new Date().toLocaleTimeString();
+                  detailsDiv.innerHTML += `[${time}] ✅ ${totalEmbeddingChunks}개 처리 (성공: ${successCount}, 실패: ${failCount})<br>`;
+                  detailsDiv.scrollTop = detailsDiv.scrollHeight;
+                }
+                
+              } catch (indexError) {
+                console.error(`[btn_learn_3] 임베딩 청크 ${totalEmbeddingChunks} 인덱스 삽입 실패:`, indexError);
                 failCount++;
               }
-              
-              // 진행 상황 로그 (50개마다)
-              if (detailsDiv && (i + 1) % 50 === 0) {
-                const time = new Date().toLocaleTimeString();
-                detailsDiv.innerHTML += `[${time}] ✅ ${i+1}/${textChunks.length} 처리 완료 (성공: ${successCount}, 실패: ${failCount})<br>`;
-                detailsDiv.scrollTop = detailsDiv.scrollHeight;
+            }
+            
+            // 남은 텍스트 (1000자 미만) 다음 청크로 이월
+            leftoverText = fullText.substring(textIdx);
+            
+            if (detailsDiv && (readChunkIdx + 1) % 10 === 0) {
+              const time = new Date().toLocaleTimeString();
+              detailsDiv.innerHTML += `[${time}] 📖 읽기 청크 ${readChunkIdx+1}/${totalReadChunks} 완료<br>`;
+              detailsDiv.scrollTop = detailsDiv.scrollHeight;
+            }
+          }
+          
+          // 마지막 남은 텍스트 처리
+          if (leftoverText.length > 0) {
+            console.log('[btn_learn_3] 마지막 남은 텍스트 처리:', leftoverText.length, 'chars');
+            totalEmbeddingChunks++;
+            
+            const embedding = await embed_query(leftoverText);
+            
+            if (embedding) {
+              try {
+                const response = await fetch(`${OPENSEARCH_API_BASE}/index`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    index: indexName,
+                    document: {
+                      text: leftoverText,
+                      embedding: embedding,
+                      chunk_index: totalEmbeddingChunks - 1,
+                      file_name: file.name,
+                      timestamp: new Date().toISOString()
+                    }
+                  })
+                });
+                
+                const result = await response.json();
+                if (result.result === 'created') {
+                  successCount++;
+                } else {
+                  failCount++;
+                }
+              } catch (e) {
+                console.error('[btn_learn_3] 마지막 청크 삽입 실패:', e);
+                failCount++;
               }
-              
-            } catch (indexError) {
-              console.error(`[btn_learn_3] 청크 ${i+1} 인덱스 삽입 실패:`, indexError);
+            } else {
               failCount++;
             }
           }
           
           console.log('[btn_learn_3] 임베딩 학습 완료');
+          console.log('[btn_learn_3] 총 임베딩 청크:', totalEmbeddingChunks);
           console.log('[btn_learn_3] 성공:', successCount, '실패:', failCount);
           
-          updateProgressPopup(totalChunks + textChunks.length, totalChunks + textChunks.length, '✓ 완료!');
+          updateProgressPopup(totalReadChunks, totalReadChunks, '✓ 완료!');
           
           if (detailsDiv) {
             const time = new Date().toLocaleTimeString();
             detailsDiv.innerHTML += `[${time}] 🎉 임베딩 학습 완료!<br>`;
+            detailsDiv.innerHTML += `[${time}] 📊 총 임베딩 청크: ${totalEmbeddingChunks}개<br>`;
             detailsDiv.innerHTML += `[${time}] ✅ 성공: ${successCount}개, ❌ 실패: ${failCount}개<br>`;
             detailsDiv.scrollTop = detailsDiv.scrollHeight;
           }
@@ -1954,8 +1997,8 @@ ${JSON.stringify(summaryStats, null, 2)}
           
           setTimeout(() => {
             progressPopup.remove();
-            showResult(3, `✓ 임베딩 학습 완료\n성공: ${successCount}개\n실패: ${failCount}개\n인덱스: ${indexName}`, true);
-            alert(`임베딩 학습 완료!\n성공: ${successCount}개\n실패: ${failCount}개`);
+            showResult(3, `✓ 임베딩 학습 완료\n총 청크: ${totalEmbeddingChunks}개\n성공: ${successCount}개\n실패: ${failCount}개\n인덱스: ${indexName}`, true);
+            alert(`임베딩 학습 완료!\n\n총 청크: ${totalEmbeddingChunks}개\n성공: ${successCount}개\n실패: ${failCount}개`);
           }, 2000);
           
         } catch (error) {
